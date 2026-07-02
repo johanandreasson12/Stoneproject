@@ -1330,15 +1330,16 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
   // Generera uppgifter från alla projekt
   const uppgifter = [];
 
-  const ignorerade = {};
-  projects.forEach(p => { Object.assign(ignorerade, ...[p.ignoreradeTodos || {}].map(o => Object.fromEntries(Object.entries(o).map(([k,v]) => [`${p.id}-${k}`, v])))); });
 
-  const arIgnorerad = (projektId, typ) => {
-    const key = `${projektId}-${typ}`;
-    const val = ignorerade[key];
+
+  const arIgnorerad = (projektId, nyckel) => {
+    if (!nyckel) return false;
+    const p = projects.find(pr => pr.id === projektId);
+    if (!p) return false;
+    const val = (p.ignoreradeTodos || {})[nyckel];
     if (!val) return false;
     if (val === "permanent") return true;
-    if (val > today()) return true; // snoozed
+    if (val > today()) return true;
     return false;
   };
 
@@ -1655,8 +1656,8 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
                 </div>
                 {/* Knappar – UTANFÖR klickbar del */}
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => { alert("snooze: " + nyckel); onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
-                  <button onClick={() => { alert("ignorera: " + nyckel); onIgnorera && onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
+                  <button onClick={() => { onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
+                  <button onClick={() => { onIgnorera && onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
                 </div>
               </div>
             );
@@ -1766,11 +1767,10 @@ export default function App() {
 
   const ignoreraTodo = async (projekt, nyckel, typ) => {
     if (!nyckel || !projekt) return;
-    console.log("Ignorerar:", projekt.id, nyckel, typ);
     const snoozeDate = typ === "snooze7" ? new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10) : "permanent";
     const nyIgnorade = { ...(projekt.ignoreradeTodos || {}), [nyckel]: snoozeDate };
-    await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
     setProjects(ps => ps.map(p => p.id === projekt.id ? { ...p, ignoreradeTodos: nyIgnorade } : p));
+    await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
   };
 
   if (loading) return (
