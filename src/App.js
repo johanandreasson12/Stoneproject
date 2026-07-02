@@ -1654,8 +1654,8 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
 
                 {/* Ignorera/Snooze */}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button title="Snooze 1 vecka" onClick={e => { e.stopPropagation(); onIgnorera && onIgnorera(u.projekt, u.ignoreraNyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange }}>💤</button>
-                  <button title="Ignorera permanent" onClick={e => { e.stopPropagation(); onIgnorera && onIgnorera(u.projekt, u.ignoreraNyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted }}>✕</button>
+                  <button title="Snooze 1 vecka" onClick={e => { e.stopPropagation(); const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange, zIndex: 10, position: "relative" }}>💤</button>
+                  <button title="Ignorera permanent" onClick={e => { e.stopPropagation(); const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted, zIndex: 10, position: "relative" }}>✕</button>
                 </div>
 
                 {/* Tidsstatus */}
@@ -1779,7 +1779,8 @@ export default function App() {
   const openProject = (p) => setSelected(p);
 
   const ignoreraTodo = async (projekt, nyckel, typ) => {
-    if (!nyckel) return;
+    if (!nyckel || !projekt) return;
+    console.log("Ignorerar:", projekt.id, nyckel, typ);
     const snoozeDate = typ === "snooze7" ? new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10) : "permanent";
     const nyIgnorade = { ...(projekt.ignoreradeTodos || {}), [nyckel]: snoozeDate };
     await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
