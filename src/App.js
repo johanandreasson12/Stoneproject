@@ -1783,12 +1783,7 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Inter', system-ui, sans-serif", background: C.bg, color: C.text }}>
-      {saving && (
-        <div style={{ position: "fixed", bottom: 20, right: 20, background: C.text, color: "#fff", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 600, zIndex: 9999, display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-          Sparar…
-        </div>
-      )}
+
 
       {/* Sidebar */}
       <aside style={{ width: sidebarOpen ? 220 : 0, minWidth: sidebarOpen ? 220 : 0, background: C.text, display: "flex", flexDirection: "column", transition: "width 0.2s, min-width 0.2s", overflow: "hidden" }}>
