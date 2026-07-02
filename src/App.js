@@ -350,7 +350,11 @@ const OffertModal = ({ project, onClose, onSave, onDelete, onPromoteToOrder }) =
           </div>
 
           {/* Projekt todos */}
-          <ProjektTodosPanel todos={form.projektTodos} onChange={v => set("projektTodos", v)} />
+          <ProjektTodosPanel todos={form.projektTodos} onChange={async v => {
+                set("projektTodos", v);
+                await sb.from("projects").update({ projekt_todos: v }).eq("id", form.id);
+                setProjects(ps => ps.map(p => p.id === form.id ? { ...p, projektTodos: v } : p));
+              }} />
 
           {/* Markera som tappad */}
           {!showTapp ? (
@@ -768,7 +772,11 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
           </div>
 
           {/* Projekt todos */}
-          <ProjektTodosPanel todos={f.projektTodos} onChange={v => set("projektTodos", v)} />
+          <ProjektTodosPanel todos={f.projektTodos} onChange={async v => {
+                set("projektTodos", v);
+                await sb.from("projects").update({ projekt_todos: v }).eq("id", f.id);
+                setProjects(ps => ps.map(p => p.id === f.id ? { ...p, projektTodos: v } : p));
+              }} />
 
           {/* Avsluta / fakturera order */}
           <div style={{ display: "flex", gap: 10 }}>
@@ -1329,7 +1337,6 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     if (p.projektTodos && p.projektTodos.length > 0) {
       p.projektTodos.forEach(todo => {
         if (todo.klar) return;
-        if (katFilter && p.kategori !== katFilter) return;
         const d = todo.datum ? Math.round((new Date(todo.datum) - new Date()) / 86400000) : null;
         uppgifter.push({
           id: `todo-${p.id}-${todo.id}`, projekt: p, typ: "todo",
@@ -1709,7 +1716,10 @@ export default function App() {
               ))}
               <Field label="Värde (kr)"><input type="number" defaultValue={selected.värde} style={inputSt} onChange={e => setSelected(s => ({ ...s, värde: Number(e.target.value) }))} /></Field>
             </div>
-            <ProjektTodosPanel todos={selected.projektTodos || []} onChange={v => setSelected(s => ({ ...s, projektTodos: v }))} />
+            <ProjektTodosPanel todos={selected.projektTodos || []} onChange={v => {
+              setSelected(s => ({ ...s, projektTodos: v }));
+              saveProject({ ...selected, projektTodos: v }, true);
+            }} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
               <button onClick={() => deleteProject(selected.id)} style={{ background: "none", color: C.red, border: "none", cursor: "pointer", fontWeight: 600 }}>Ta bort</button>
               <div style={{ display: "flex", gap: 8 }}>
