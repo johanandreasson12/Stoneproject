@@ -67,6 +67,7 @@ const toDb = (p) => ({
   projekt_todos: p.projektTodos || [],
   delfaktureringar: p.delfaktureringar || [],
   attester: p.attester || {},
+  ignorerade_todos: p.ignoreradeTodos || {},
 });
 
 // snake_case → camelCase från Supabase
@@ -131,6 +132,7 @@ const fromDb = (r) => ({
   projektTodos: r.projekt_todos || [],
   delfaktureringar: r.delfaktureringar || [],
   attester: r.attester || {},
+  ignoreradeTodos: r.ignorerade_todos || {},
 });
 
 // ── Palett ───────────────────────────────────────────────────────────────────
@@ -1322,11 +1324,23 @@ const ProjektTodosPanel = ({ todos, onChange }) => {
 };
 
 // ── ATT-GÖRA PANEL ───────────────────────────────────────────────────────────
-const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
+const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
   const [katFilter, setKatFilter] = useState(kategoriFilter || null);
 
   // Generera uppgifter från alla projekt
   const uppgifter = [];
+
+  const ignorerade = {};
+  projects.forEach(p => { Object.assign(ignorerade, ...[p.ignoreradeTodos || {}].map(o => Object.fromEntries(Object.entries(o).map(([k,v]) => [`${p.id}-${k}`, v])))); });
+
+  const arIgnorerad = (projektId, typ) => {
+    const key = `${projektId}-${typ}`;
+    const val = ignorerade[key];
+    if (!val) return false;
+    if (val === "permanent") return true;
+    if (val > today()) return true; // snoozed
+    return false;
+  };
 
   projects.forEach(p => {
     if (katFilter && p.kategori !== katFilter) return;
@@ -1334,11 +1348,11 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     // Kalkyl-deadline
     if (p.status === "kalkyl" && p.kalkylDeadline) {
       const d = dagnarKvar(p.kalkylDeadline);
-      uppgifter.push({
+      if (!arIgnorerad(p.id, "kalkyl")) uppgifter.push({
         id: `kalkyl-${p.id}`, projekt: p, typ: "kalkyl",
         ikon: "🧮", label: "Offert ska räknas klart",
         detalj: `Deadline: ${p.kalkylDeadline}`,
-        dagar: d, sortera: d ?? 9999,
+        dagar: d, sortera: d ?? 9999, ignoreraNyckel: "kalkyl",
       });
     }
 
@@ -1350,7 +1364,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         id: `matning-${p.id}`, projekt: p, typ: "matning",
         ikon: "📐", label: "Mätning ska utföras",
         detalj: `v.${p.prelimVeckaMätning}${p.mätningUE ? " (UE)" : " (vi)"}`,
-        dagar: v !== null ? v * 7 : null, sortera: v !== null ? v * 7 : 9999,
+        dagar: v !== null ? v * 7 : null, sortera: v !== null ? v * 7 : 9999, ignoreraNyckel: "matning",
       });
     }
 
@@ -1360,7 +1374,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       uppgifter.push({
         id: `leverans-${p.id}`, projekt: p, typ: "leverans",
         ikon: "🚚", label: "Leverans",
-        detalj: `v.${p.prelimVeckaLeverans}${p.leveranstyp === "installeras_av_oss" ? (p.leveransUE ? " · Installation (UE)" : " · Installation (vi)") : p.leveranstyp === "avhämtas" ? " · Avhämtas" : " · Skickas"}`,
+        ignoreraNyckel: "leverans", detalj: `v.${p.prelimVeckaLeverans}${p.leveranstyp === "installeras_av_oss" ? (p.leveransUE ? " · Installation (UE)" : " · Installation (vi)") : p.leveranstyp === "avhämtas" ? " · Avhämtas" : " · Skickas"}`,
         dagar: v !== null ? v * 7 : null, sortera: v !== null ? v * 7 : 9999,
       });
     }
@@ -1369,7 +1383,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     if (p.status === "order" && p.harVask && p.vaskTillhandahåller === "vi" && !p.vaskOrderSkickad) {
       uppgifter.push({
         id: `vask-${p.id}`, projekt: p, typ: "vask",
-        ikon: "🪣", label: "Vaskorder ej skickad till leverantör",
+        ikon: "🪣", label: "Vaskorder ej skickad till leverantör", ignoreraNyckel: "vask_order",
         detalj: p.vaskModell || "Modell ej angiven",
         dagar: null, sortera: -1,
       });
@@ -1379,7 +1393,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     if (p.status === "order" && !p.orderSkickadLeverantör) {
       uppgifter.push({
         id: `stenorder-${p.id}`, projekt: p, typ: "stenorder",
-        ikon: "📋", label: "Order ej skickad till stenleverantör",
+        ikon: "📋", label: "Order ej skickad till stenleverantör", ignoreraNyckel: "sten_order",
         detalj: p.producent || "Leverantör ej vald",
         dagar: null, sortera: -1,
       });
@@ -1392,7 +1406,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       if (dagarSedan >= 5 && saknarInfo) {
         uppgifter.push({
           id: `stenorder-info-${p.id}`, projekt: p, typ: "varning",
-          ikon: "⚠️", label: `Ordernr/pris saknas hos ${p.producent || "leverantör"} – skickades för ${dagarSedan} dagar sedan`,
+          ikon: "⚠️", ignoreraNyckel: "sten_info", label: `Ordernr/pris saknas hos ${p.producent || "leverantör"} – skickades för ${dagarSedan} dagar sedan`,
           detalj: `Fyll i ordernummer och inköpspris`,
           dagar: -1, sortera: -2,
         });
@@ -1406,7 +1420,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       if (dagarSedan >= 5 && saknarInfo) {
         uppgifter.push({
           id: `vask-info-${p.id}`, projekt: p, typ: "varning",
-          ikon: "⚠️", label: `Vasknr/pris saknas – order skickades för ${dagarSedan} dagar sedan`,
+          ikon: "⚠️", ignoreraNyckel: "vask_info", label: `Vasknr/pris saknas – order skickades för ${dagarSedan} dagar sedan`,
           detalj: `${p.vaskModell || "Vask"} – fyll i ordernummer och inköpspris`,
           dagar: -1, sortera: -2,
         });
@@ -1423,7 +1437,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         if (!p.mätningUEOrderSkickad) {
           uppgifter.push({
             id: `ue-mat-${p.id}`, projekt: p, typ: "ue",
-            ikon: "📐", label: "UE-order för mätning ej skickad",
+            ikon: "📐", label: "UE-order för mätning ej skickad", ignoreraNyckel: "ue_mat",
             detalj: `Ska vara skickat senast ${deadline.toLocaleDateString("sv-SE")} (2v före v.${p.prelimVeckaMätning})`,
             dagar: d, sortera: d,
           });
@@ -1441,7 +1455,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         if (!p.installationUEOrderSkickad) {
           uppgifter.push({
             id: `ue-inst-${p.id}`, projekt: p, typ: "ue",
-            ikon: "🔨", label: "UE-order för installation ej skickad",
+            ikon: "🔨", label: "UE-order för installation ej skickad", ignoreraNyckel: "ue_inst",
             detalj: `Ska vara skickat senast ${deadline.toLocaleDateString("sv-SE")} (2v före v.${p.prelimVeckaLeverans})`,
             dagar: d, sortera: d,
           });
@@ -1456,7 +1470,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         const d = Math.round((matningDatum - new Date()) / 86400000);
         uppgifter.push({
           id: `vask-timing-${p.id}`, projekt: p, typ: "vask",
-          ikon: "🪣", label: "Vask måste beställas senast mätningsveckan",
+          ikon: "🪣", label: "Vask måste beställas senast mätningsveckan", ignoreraNyckel: "vask_timing",
           detalj: `Mätning v.${p.prelimVeckaMätning} – beställ senast då`,
           dagar: d, sortera: d + 0.5,
         });
@@ -1477,7 +1491,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       const d = Math.round((deadline - new Date()) / 86400000);
       uppgifter.push({
         id: `fardigdag-${p.id}`, projekt: p, typ: "produktion",
-        ikon: "📅", label: "Bekräfta dag när ordern är färdig från produktion",
+        ikon: "📅", label: "Bekräfta dag när ordern är färdig från produktion", ignoreraNyckel: "fardigdag",
         detalj: `Order i produktion sedan ${p.produktionStartDatum} – svar senast ${deadline.toLocaleDateString("sv-SE")}`,
         dagar: d, sortera: d,
       });
@@ -1487,7 +1501,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     if (p.status === "order" && p.fardigDag && p.leveranstyp === "installeras_av_oss" && p.leveransUE && !p.ueInfoSkickad) {
       uppgifter.push({
         id: `ue-info-${p.id}`, projekt: p, typ: "varning",
-        ikon: "📲", label: "Skicka färdigdag till installations-UE",
+        ikon: "📲", label: "Skicka färdigdag till installations-UE", ignoreraNyckel: "ue_info_dag",
         detalj: `Färdig: ${p.fardigDag} – UE har inte fått info`,
         dagar: 0, sortera: -1.5,
       });
@@ -1500,7 +1514,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         const d = todo.datum ? Math.round((new Date(todo.datum) - new Date()) / 86400000) : null;
         uppgifter.push({
           id: `todo-${p.id}-${todo.id}`, projekt: p, typ: "todo",
-          ikon: "☑️", label: todo.text,
+          ikon: "☑️", label: todo.text, ignoreraNyckel: `todo_${todo.id}`,
           detalj: p.namn,
           dagar: d, sortera: d !== null ? d : 9998,
         });
@@ -1515,7 +1529,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       const d = Math.round((deadline - new Date()) / 86400000);
       uppgifter.push({
         id: `frakt-${p.id}`, projekt: p, typ: "frakt",
-        ikon: "🚛", label: "Frakt ej bokad",
+        ikon: "🚛", label: "Frakt ej bokad", ignoreraNyckel: "frakt",
         detalj: `Boka senast ${deadline.toLocaleDateString("sv-SE")} (3 dagar före färdig ${p.fardigDag})`,
         dagar: d, sortera: d,
       });
@@ -1530,7 +1544,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         const d = Math.round((deadline - new Date()) / 86400000);
         uppgifter.push({
           id: `bekrafta-matning-${p.id}`, projekt: p, typ: "matning",
-          ikon: "📅", label: "Bekräfta exakt datum för mätning",
+          ikon: "📅", label: "Bekräfta exakt datum för mätning", ignoreraNyckel: "bekr_mat",
           detalj: `Senast ${deadline.toLocaleDateString("sv-SE")} – 1 vecka före prel. v.${p.prelimVeckaMätning}`,
           dagar: d, sortera: d - 0.1,
         });
@@ -1546,7 +1560,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
         const d = Math.round((deadline - new Date()) / 86400000);
         uppgifter.push({
           id: `bekrafta-installation-${p.id}`, projekt: p, typ: "leverans",
-          ikon: "🔨", label: "Bekräfta exakt datum för installation",
+          ikon: "🔨", label: "Bekräfta exakt datum för installation", ignoreraNyckel: "bekr_inst",
           detalj: `Senast ${deadline.toLocaleDateString("sv-SE")} – 1 vecka före prel. v.${p.prelimVeckaLeverans}`,
           dagar: d, sortera: d - 0.1,
         });
@@ -1561,7 +1575,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       if (dagarMellan < 2) {
         uppgifter.push({
           id: `fardig-konflikt-${p.id}`, projekt: p, typ: "varning",
-          ikon: "⚠️", label: "Färdigdag för nära installationsdatum",
+          ikon: "⚠️", label: "Färdigdag för nära installationsdatum", ignoreraNyckel: "fardig_konflikt",
           detalj: `Klar ${p.fardigDag} – installation ${p.bekraftadInstallationDatum} (${dagarMellan} dag${dagarMellan !== 1 ? "ar" : ""} mellanrum, behöver minst 2)`,
           dagar: -1, sortera: -3,
         });
@@ -1569,7 +1583,9 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     }
   });
 
-  uppgifter.sort((a, b) => a.sortera - b.sortera);
+  // Filter out ignored/snoozed items
+  const visaUppgifter = uppgifter.filter(u => !arIgnorerad(u.projekt.id, u.ignoreraNyckel));
+  visaUppgifter.sort((a, b) => a.sortera - b.sortera);
 
   const TYP_FARG = {
     kalkyl:     { color: C.teal,   bg: C.tealLight },
@@ -1606,7 +1622,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       </div>
 
       {/* Lista */}
-      {uppgifter.length === 0 ? (
+      {visaUppgifter.length === 0 ? (
         <div style={{ padding: "24px", textAlign: "center", color: C.muted, fontSize: 13 }}>
           Inga uppgifter att visa 🎉
         </div>
@@ -1616,7 +1632,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
             const tf = TYP_FARG[u.typ] || TYP_FARG.kalkyl;
             return (
               <div key={u.id} onClick={() => onOpen(u.projekt)}
-                style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto auto", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < uppgifter.length - 1 ? `1px solid ${C.border}` : "none", cursor: "pointer", background: "transparent", transition: "background 0.1s" }}
+                style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", cursor: "pointer", background: "transparent", transition: "background 0.1s" }}
                 onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
@@ -1635,6 +1651,12 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
 
                 {/* Ansvarig */}
                 <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{u.projekt.ansvarig}</div>
+
+                {/* Ignorera/Snooze */}
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button title="Snooze 1 vecka" onClick={e => { e.stopPropagation(); onIgnorera && onIgnorera(u.projekt, u.ignoreraNyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange }}>💤</button>
+                  <button title="Ignorera permanent" onClick={e => { e.stopPropagation(); onIgnorera && onIgnorera(u.projekt, u.ignoreraNyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted }}>✕</button>
+                </div>
 
                 {/* Tidsstatus */}
                 <div style={{ minWidth: 60, textAlign: "right" }}>
@@ -1756,6 +1778,14 @@ export default function App() {
 
   const openProject = (p) => setSelected(p);
 
+  const ignoreraTodo = async (projekt, nyckel, typ) => {
+    if (!nyckel) return;
+    const snoozeDate = typ === "snooze7" ? new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10) : "permanent";
+    const nyIgnorade = { ...(projekt.ignoreradeTodos || {}), [nyckel]: snoozeDate };
+    await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
+    setProjects(ps => ps.map(p => p.id === projekt.id ? { ...p, ignoreradeTodos: nyIgnorade } : p));
+  };
+
   if (loading) return (
     <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', system-ui, sans-serif", background: C.bg, flexDirection: "column", gap: 16 }}>
       <div style={{ width: 40, height: 40, border: `4px solid ${C.border}`, borderTop: `4px solid ${C.accent}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -1852,7 +1882,7 @@ export default function App() {
         {/* Innehåll */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
           {activePage === "tappad" && <TappadStatistik projects={projects} />}
-          {activePage === "alla" && <AtterGoraPanel projects={projects} onOpen={openProject} kategoriFilter={kategoriFilter} />}
+          {activePage === "alla" && <AtterGoraPanel projects={projects} onOpen={openProject} kategoriFilter={kategoriFilter} onIgnorera={ignoreraTodo} />}
           {activePage === "order"
             ? <OrderPlaneringsvyn projects={filtered} onOpen={openProject} />
             : <ProjektTabell projects={filtered} onOpen={openProject} showUppfoljning={activePage === "offert" || activePage === "alla"} />
