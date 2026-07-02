@@ -1628,34 +1628,34 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
         </div>
       ) : (
         <div>
-          {uppgifter.map((u, i) => {
+          {visaUppgifter.map((u, i) => {
             const tf = TYP_FARG[u.typ] || TYP_FARG.kalkyl;
             return (
-              <div key={u.id} onClick={() => onOpen(u.projekt)}
-                style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", cursor: "pointer", background: "transparent", transition: "background 0.1s" }}
+              <div key={u.id}
+                style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
                 onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
                 {/* Ikon */}
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: tf.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{u.ikon}</div>
+                <div onClick={() => onOpen(u.projekt)} style={{ width: 28, height: 28, borderRadius: 8, background: tf.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer" }}>{u.ikon}</div>
 
                 {/* Uppgift */}
-                <div>
+                <div onClick={() => onOpen(u.projekt)} style={{ cursor: "pointer" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: tf.color, marginBottom: 1 }}>{u.label}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{u.projekt.namn}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{u.detalj}</div>
                 </div>
 
                 {/* Kategori */}
-                <KategoriChip kategori={u.projekt.kategori} />
+                <div onClick={() => onOpen(u.projekt)} style={{ cursor: "pointer" }}><KategoriChip kategori={u.projekt.kategori} /></div>
 
                 {/* Ansvarig */}
-                <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{u.projekt.ansvarig}</div>
+                <div onClick={() => onOpen(u.projekt)} style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", cursor: "pointer" }}>{u.projekt.ansvarig}</div>
 
                 {/* Ignorera/Snooze */}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button title="Snooze 1 vecka" onClick={e => { e.stopPropagation(); const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange, zIndex: 10, position: "relative" }}>💤</button>
-                  <button title="Ignorera permanent" onClick={e => { e.stopPropagation(); const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted, zIndex: 10, position: "relative" }}>✕</button>
+                  <button title="Snooze 1 vecka" onClick={() => { const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange }}>💤</button>
+                  <button title="Ignorera permanent" onClick={() => { const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted }}>✕</button>
                 </div>
 
                 {/* Tidsstatus */}
