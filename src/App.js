@@ -65,6 +65,7 @@ const toDb = (p) => ({
   frakt_kostnad: p.fraktKostnad || null,
   frakt_leveransdag: p.fraktLeveransdag || null,
   projekt_todos: p.projektTodos || [],
+  delfaktureringar: p.delfaktureringar || [],
 });
 
 // snake_case → camelCase från Supabase
@@ -127,6 +128,7 @@ const fromDb = (r) => ({
   fraktKostnad: r.frakt_kostnad || "",
   fraktLeveransdag: r.frakt_leveransdag || "",
   projektTodos: r.projekt_todos || [],
+  delfaktureringar: r.delfaktureringar || [],
 });
 
 // ── Palett ───────────────────────────────────────────────────────────────────
@@ -180,6 +182,9 @@ const STATUS_META = {
 
 const SEK = (n) => (n || 0).toLocaleString("sv-SE") + " kr";
 
+const delfakturerat = (p) => (p.delfaktureringar || []).reduce((s, d) => s + (Number(d.belopp) || 0), 0);
+const kvarstående = (p) => (p.värde || 0) - delfakturerat(p);
+
 const beraknaKostnad = (p) => {
   return (
     (Number(p.leverantörInköpspris) || 0) +
@@ -190,7 +195,7 @@ const beraknaKostnad = (p) => {
   );
 };
 
-const beraknaTB = (p) => (p.värde || 0) - beraknaKostnad(p);
+const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
@@ -577,7 +582,10 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
           <div>
             <div style={{ fontSize: 11, color: C.accent, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>{f.referens} · {f.orderNummer || "Fortnox-nr saknas"}</div>
             <div style={{ fontSize: 19, fontWeight: 800, color: C.text }}>{f.namn}</div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{f.produkt} · {SEK(f.värde)}</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+              {f.produkt} · {SEK(f.värde)}
+              {delfakturerat(f) > 0 && <span style={{ marginLeft: 10, color: C.orange, fontWeight: 600 }}>· Kvarstår: {SEK(kvarstående(f))}</span>}
+            </div>
             {beraknaKostnad(f) > 0 && (
               <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
                 <span style={{ fontSize: 12, color: C.muted }}>Inköp: <strong style={{ color: C.text }}>{SEK(beraknaKostnad(f))}</strong></span>
@@ -770,6 +778,13 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
               </div>
             </Toggle>
           </div>
+
+          {/* Delfakturering */}
+          <DelfaktureringPanel project={f} onChange={async v => {
+            set("delfaktureringar", v);
+            await sb.from("projects").update({ delfaktureringar: v }).eq("id", f.id);
+            setProjects(ps => ps.map(p => p.id === f.id ? { ...p, delfaktureringar: v } : p));
+          }} />
 
           {/* Projekt todos */}
           <ProjektTodosPanel todos={f.projektTodos} onChange={async v => {
@@ -1111,6 +1126,66 @@ const BradeskorFarg = (dagar) => {
   return C.green;
 };
 
+
+
+// ── DELFAKTURERING ───────────────────────────────────────────────────────────
+const DelfaktureringPanel = ({ project, onChange }) => {
+  const [nyttBelopp, setNyttBelopp] = useState("");
+  const [nyttDatum, setNyttDatum] = useState("");
+  const [nyttNotat, setNyttNotat] = useState("");
+
+  const laggTill = () => {
+    if (!nyttBelopp) return;
+    const ny = { id: Date.now(), belopp: Number(nyttBelopp), datum: nyttDatum, notat: nyttNotat };
+    onChange([...(project.delfaktureringar || []), ny]);
+    setNyttBelopp(""); setNyttDatum(""); setNyttNotat("");
+  };
+
+  const tabort = (id) => onChange((project.delfaktureringar || []).filter(d => d.id !== id));
+
+  const totalt = delfakturerat(project);
+  const kvar = kvarstående(project);
+  const pct = project.värde ? Math.round(totalt / project.värde * 100) : 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>Delfakturering</div>
+
+      {/* Summering */}
+      {(project.delfaktureringar || []).length > 0 && (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ background: C.greenLight, borderRadius: 8, padding: "8px 14px" }}>
+            <div style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>Fakturerat</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.green }}>{SEK(totalt)} <span style={{ fontSize: 11, fontWeight: 400 }}>({pct}%)</span></div>
+          </div>
+          <div style={{ background: C.orangeLight, borderRadius: 8, padding: "8px 14px" }}>
+            <div style={{ fontSize: 11, color: C.orange, fontWeight: 600 }}>Kvarstår</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.orange }}>{SEK(kvar)}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista */}
+      {(project.delfaktureringar || []).map((d, i) => (
+        <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: C.grayLight, borderRadius: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{SEK(d.belopp)}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{d.datum || "Inget datum"}{d.notat ? ` · ${d.notat}` : ""}</div>
+          </div>
+          <button onClick={() => tabort(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16 }}>×</button>
+        </div>
+      ))}
+
+      {/* Ny rad */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr auto", gap: 8 }}>
+        <input type="number" value={nyttBelopp} onChange={e => setNyttBelopp(e.target.value)} placeholder="Belopp (kr)" style={inputSt} />
+        <input type="date" value={nyttDatum} onChange={e => setNyttDatum(e.target.value)} style={inputSt} />
+        <input value={nyttNotat} onChange={e => setNyttNotat(e.target.value)} placeholder="Notat (valfritt)" style={inputSt} />
+        <button onClick={laggTill} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>+ Lägg till</button>
+      </div>
+    </div>
+  );
+};
 
 // ── PROJEKT TODOS MINI-KOMPONENT ─────────────────────────────────────────────
 const ProjektTodosPanel = ({ todos, onChange }) => {
@@ -1539,6 +1614,7 @@ export default function App() {
     });
 
   const totalVärde = filtered.reduce((s, p) => s + (p.värde || 0), 0);
+  const totalKvarstaende = filtered.reduce((s, p) => s + kvarstående(p), 0);
   const counts = Object.fromEntries(Object.keys(STATUS_META).map(k => [k, projects.filter(p => p.status === k).length]));
 
   const saveProject = async (updated) => {
@@ -1655,6 +1731,9 @@ export default function App() {
         <div style={{ padding: "16px 24px 0", display: "flex", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
           <KpiCard label="Projekt" value={filtered.length} />
           <KpiCard label="Totalt värde" value={SEK(totalVärde)} color={C.accent} />
+          {(activePage === "order" || activePage === "faktureras") && totalKvarstaende !== totalVärde && (
+            <KpiCard label="Kvarstår att fakturera" value={SEK(totalKvarstaende)} color={C.orange} />
+          )}
           {activePage === "alla" && <>
             <KpiCard label="Räknas på" value={counts.kalkyl || 0} color={C.teal} />
             <KpiCard label="Offerter" value={counts.offert} color={C.orange} />
