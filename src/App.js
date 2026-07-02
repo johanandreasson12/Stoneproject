@@ -66,6 +66,7 @@ const toDb = (p) => ({
   frakt_leveransdag: p.fraktLeveransdag || null,
   projekt_todos: p.projektTodos || [],
   delfaktureringar: p.delfaktureringar || [],
+  attester: p.attester || {},
 });
 
 // snake_case → camelCase från Supabase
@@ -129,6 +130,7 @@ const fromDb = (r) => ({
   fraktLeveransdag: r.frakt_leveransdag || "",
   projektTodos: r.projekt_todos || [],
   delfaktureringar: r.delfaktureringar || [],
+  attester: r.attester || {},
 });
 
 // ── Palett ───────────────────────────────────────────────────────────────────
@@ -185,17 +187,23 @@ const SEK = (n) => (n || 0).toLocaleString("sv-SE") + " kr";
 const delfakturerat = (p) => (p.delfaktureringar || []).reduce((s, d) => s + (Number(d.belopp) || 0), 0);
 const kvarstående = (p) => (p.värde || 0) - delfakturerat(p);
 
+const attestBelopp = (p, key) => {
+  const a = (p.attester || {})[key];
+  return a && a.faktiskKostnad ? Number(a.faktiskKostnad) : null;
+};
+const inköpBelopp = (p, key, budget) => attestBelopp(p, key) !== null ? attestBelopp(p, key) : (Number(budget) || 0);
+
 const beraknaKostnad = (p) => {
   return (
-    (Number(p.leverantörInköpspris) || 0) +
-    (Number(p.vaskInköpspris) || 0) +
-    (Number(p.fraktKostnad) || 0) +
-    (Number(p.ueMatningKostnad) || 0) +
-    (Number(p.ueInstallationKostnad) || 0)
+    inköpBelopp(p, "sten", p.leverantörInköpspris) +
+    inköpBelopp(p, "vask", p.vaskInköpspris) +
+    inköpBelopp(p, "frakt", p.fraktKostnad) +
+    inköpBelopp(p, "uematning", p.ueMatningKostnad) +
+    inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad)
   );
 };
 
-const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
+const beraknaTB = (p) => (p.värde || 0) - beraknaKostnad(p);
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
@@ -779,6 +787,13 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
             </Toggle>
           </div>
 
+          {/* Attest */}
+          <AttestPanel project={f} onChange={async v => {
+            set("attester", v);
+            await sb.from("projects").update({ attester: v }).eq("id", f.id);
+            setProjects(ps => ps.map(p => p.id === f.id ? { ...p, attester: v } : p));
+          }} />
+
           {/* Delfakturering */}
           <DelfaktureringPanel project={f} onChange={async v => {
             set("delfaktureringar", v);
@@ -1127,6 +1142,76 @@ const BradeskorFarg = (dagar) => {
 };
 
 
+
+
+// ── ATTEST-KOMPONENT ─────────────────────────────────────────────────────────
+const AttestRad = ({ label, budgetBelopp, attestKey, attester, onChange }) => {
+  const a = (attester || {})[attestKey] || {};
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ faktiskKostnad: a.faktiskKostnad || "", fakturanummer: a.fakturanummer || "", fakturadatum: a.fakturadatum || "" });
+
+  if (!budgetBelopp && !a.faktiskKostnad) return null;
+
+  const spara = () => {
+    onChange({ ...(attester || {}), [attestKey]: { ...form, attesterad: true, attestDatum: today() } });
+    setOpen(false);
+  };
+
+  const avAttest = () => {
+    const ny = { ...(attester || {}) };
+    delete ny[attestKey];
+    onChange(ny);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: a.attesterad ? C.greenLight : C.surface, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
+        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${a.attesterad ? C.green : C.border}`, background: a.attesterad ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {a.attesterad && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Budget: {SEK(Number(budgetBelopp) || 0)}
+            {a.faktiskKostnad && <span style={{ color: a.faktiskKostnad > budgetBelopp ? C.red : C.green, marginLeft: 8 }}>· Faktura: {SEK(Number(a.faktiskKostnad))}</span>}
+            {a.fakturanummer && <span style={{ color: C.muted, marginLeft: 8 }}>· #{a.fakturanummer}</span>}
+          </div>
+        </div>
+        <span style={{ color: C.muted, fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: 14, borderTop: `1px solid ${C.border}`, background: C.grayLight, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <Field label="Faktisk kostnad (kr)"><input type="number" value={form.faktiskKostnad} onChange={e => setForm(f => ({ ...f, faktiskKostnad: e.target.value }))} style={inputSt} /></Field>
+            <Field label="Fakturanummer"><input value={form.fakturanummer} onChange={e => setForm(f => ({ ...f, fakturanummer: e.target.value }))} style={inputSt} /></Field>
+            <Field label="Fakturadatum"><input type="date" value={form.fakturadatum} onChange={e => setForm(f => ({ ...f, fakturadatum: e.target.value }))} style={inputSt} /></Field>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={spara} style={{ background: C.green, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer" }}>✓ Attestera</button>
+            {a.attesterad && <button onClick={avAttest} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 14px", cursor: "pointer", color: C.muted, fontSize: 13 }}>Ta bort attest</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AttestPanel = ({ project, onChange }) => {
+  const harNågot = project.leverantörInköpspris || project.vaskInköpspris || project.fraktKostnad || project.ueMatningKostnad || project.ueInstallationKostnad;
+  if (!harNågot) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>Attestera fakturor</div>
+      {project.leverantörInköpspris && <AttestRad label={`Stenmaterial – ${project.producent || "Leverantör"}`} budgetBelopp={project.leverantörInköpspris} attestKey="sten" attester={project.attester} onChange={onChange} />}
+      {project.vaskInköpspris && project.harVask && <AttestRad label={`Vask – ${project.vaskModell || "Vask"}`} budgetBelopp={project.vaskInköpspris} attestKey="vask" attester={project.attester} onChange={onChange} />}
+      {project.ueMatningKostnad && project.mätningUE && <AttestRad label="UE Mätning" budgetBelopp={project.ueMatningKostnad} attestKey="uematning" attester={project.attester} onChange={onChange} />}
+      {project.ueInstallationKostnad && project.leveransUE && <AttestRad label="UE Installation" budgetBelopp={project.ueInstallationKostnad} attestKey="ueinstallation" attester={project.attester} onChange={onChange} />}
+      {project.fraktKostnad && project.fraktSkaBokas && <AttestRad label="Frakt" budgetBelopp={project.fraktKostnad} attestKey="frakt" attester={project.attester} onChange={onChange} />}
+    </div>
+  );
+};
 
 // ── DELFAKTURERING ───────────────────────────────────────────────────────────
 const DelfaktureringPanel = ({ project, onChange }) => {
