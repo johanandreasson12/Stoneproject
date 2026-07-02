@@ -1630,47 +1630,33 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
         <div>
           {visaUppgifter.map((u, i) => {
             const tf = TYP_FARG[u.typ] || TYP_FARG.kalkyl;
+            const nyckel = u.ignoreraNyckel || u.id;
+            const tidsstatus = u.dagar === null ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: C.redLight, padding: "2px 8px", borderRadius: 6 }}>Åtgärda</span>
+              : u.dagar < 0 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>{Math.abs(u.dagar)}d sen</span>
+              : u.dagar === 0 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>Idag!</span>
+              : u.dagar <= 7 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.orange }}>Om {u.dagar}d</span>
+              : <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>v.{u.projekt.prelimVeckaLeverans || u.projekt.prelimVeckaMätning || "?"}</span>;
             return (
-              <div key={u.id}
-                style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
+              <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
                 onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                {/* Ikon */}
-                <div onClick={() => onOpen(u.projekt)} style={{ width: 28, height: 28, borderRadius: 8, background: tf.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer" }}>{u.ikon}</div>
-
-                {/* Uppgift */}
-                <div onClick={() => onOpen(u.projekt)} style={{ cursor: "pointer" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: tf.color, marginBottom: 1 }}>{u.label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{u.projekt.namn}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{u.detalj}</div>
+                {/* Klickbar del */}
+                <div onClick={() => onOpen(u.projekt)} style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, cursor: "pointer", minWidth: 0 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: tf.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{u.ikon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: tf.color, marginBottom: 1 }}>{u.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{u.projekt.namn}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{u.detalj}</div>
+                  </div>
+                  <KategoriChip kategori={u.projekt.kategori} />
+                  <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{u.projekt.ansvarig}</div>
+                  <div style={{ minWidth: 60, textAlign: "right" }}>{tidsstatus}</div>
                 </div>
-
-                {/* Kategori */}
-                <div onClick={() => onOpen(u.projekt)} style={{ cursor: "pointer" }}><KategoriChip kategori={u.projekt.kategori} /></div>
-
-                {/* Ansvarig */}
-                <div onClick={() => onOpen(u.projekt)} style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", cursor: "pointer" }}>{u.projekt.ansvarig}</div>
-
-                {/* Ignorera/Snooze */}
-                <div style={{ display: "flex", gap: 4 }}>
-                  <button title="Snooze 1 vecka" onClick={() => { const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.orange }}>💤</button>
-                  <button title="Ignorera permanent" onClick={() => { const nyckel = u.ignoreraNyckel || u.id; if (onIgnorera) onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 12, color: C.muted }}>✕</button>
-                </div>
-
-                {/* Tidsstatus */}
-                <div style={{ minWidth: 60, textAlign: "right" }}>
-                  {u.dagar === null ? (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: C.redLight, padding: "2px 8px", borderRadius: 6 }}>Åtgärda</span>
-                  ) : u.dagar < 0 ? (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>{Math.abs(u.dagar)}d sen</span>
-                  ) : u.dagar === 0 ? (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>Idag!</span>
-                  ) : u.dagar <= 7 ? (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.orange }}>Om {u.dagar}d</span>
-                  ) : (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>v.{u.projekt.prelimVeckaLeverans || u.projekt.prelimVeckaMätning || "?"}</span>
-                  )}
+                {/* Knappar – UTANFÖR klickbar del */}
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7")} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
+                  <button onClick={() => onIgnorera && onIgnorera(u.projekt, nyckel, "permanent")} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
                 </div>
               </div>
             );
