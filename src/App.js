@@ -64,6 +64,7 @@ const toDb = (p) => ({
   frakt_ordernummer: p.fraktOrdernummer || null,
   frakt_kostnad: p.fraktKostnad || null,
   frakt_leveransdag: p.fraktLeveransdag || null,
+  projekt_todos: p.projektTodos || [],
 });
 
 // snake_case → camelCase från Supabase
@@ -125,6 +126,7 @@ const fromDb = (r) => ({
   fraktOrdernummer: r.frakt_ordernummer || "",
   fraktKostnad: r.frakt_kostnad || "",
   fraktLeveransdag: r.frakt_leveransdag || "",
+  projektTodos: r.projekt_todos || [],
 });
 
 // ── Palett ───────────────────────────────────────────────────────────────────
@@ -346,6 +348,9 @@ const OffertModal = ({ project, onClose, onSave, onDelete, onPromoteToOrder }) =
               </div>
             ))}
           </div>
+
+          {/* Projekt todos */}
+          <ProjektTodosPanel todos={form.projektTodos} onChange={v => set("projektTodos", v)} />
 
           {/* Markera som tappad */}
           {!showTapp ? (
@@ -762,6 +767,9 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
             </Toggle>
           </div>
 
+          {/* Projekt todos */}
+          <ProjektTodosPanel todos={f.projektTodos} onChange={v => set("projektTodos", v)} />
+
           {/* Avsluta / fakturera order */}
           <div style={{ display: "flex", gap: 10 }}>
             {f.status !== "faktureras" && (
@@ -869,6 +877,7 @@ const NyProjektModal = ({ onClose, onSave, onSaveAndOrder, nextNummer, defaultSt
     ansvarig: "",
     notat: "",
     kalkylDeadline: "",
+    projektTodos: [],
   });
   const setBas_ = (k, v) => setBas(f => ({ ...f, [k]: v }));
 
@@ -1094,6 +1103,56 @@ const BradeskorFarg = (dagar) => {
   return C.green;
 };
 
+
+// ── PROJEKT TODOS MINI-KOMPONENT ─────────────────────────────────────────────
+const ProjektTodosPanel = ({ todos, onChange }) => {
+  const [nyText, setNyText] = useState("");
+  const [nyDatum, setNyDatum] = useState("");
+
+  const laggTill = () => {
+    if (!nyText.trim()) return;
+    const ny = { id: Date.now(), text: nyText.trim(), datum: nyDatum, klar: false };
+    onChange([...(todos || []), ny]);
+    setNyText("");
+    setNyDatum("");
+  };
+
+  const toggleKlar = (id) => {
+    onChange((todos || []).map(t => t.id === id ? { ...t, klar: !t.klar } : t));
+  };
+
+  const tabort = (id) => {
+    onChange((todos || []).filter(t => t.id !== id));
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>Att göra</div>
+      {(todos || []).map(t => {
+        const d = t.datum ? Math.round((new Date(t.datum) - new Date()) / 86400000) : null;
+        const fc = d === null ? C.muted : d < 0 ? C.red : d <= 3 ? C.orange : C.green;
+        return (
+          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: t.klar ? C.grayLight : C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
+            <input type="checkbox" checked={t.klar} onChange={() => toggleKlar(t.id)} style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: t.klar ? C.muted : C.text, textDecoration: t.klar ? "line-through" : "none" }}>{t.text}</div>
+              {t.datum && <div style={{ fontSize: 11, fontWeight: 600, color: t.klar ? C.muted : fc }}>
+                {d === null ? "" : d < 0 ? `${Math.abs(d)} dagar sen` : d === 0 ? "Idag!" : `Om ${d} dagar`} · {t.datum}
+              </div>}
+            </div>
+            <button onClick={() => tabort(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1 }}>×</button>
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={nyText} onChange={e => setNyText(e.target.value)} onKeyDown={e => e.key === "Enter" && laggTill()} placeholder="Ny uppgift…" style={{ ...inputSt, flex: 1 }} />
+        <input type="date" value={nyDatum} onChange={e => setNyDatum(e.target.value)} style={{ ...inputSt, width: 140 }} />
+        <button onClick={laggTill} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>+ Lägg till</button>
+      </div>
+    </div>
+  );
+};
+
 // ── ATT-GÖRA PANEL ───────────────────────────────────────────────────────────
 const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
   const [katFilter, setKatFilter] = useState(kategoriFilter || null);
@@ -1266,6 +1325,21 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
       });
     }
 
+    // Projekt-todos med deadline
+    if (p.projektTodos && p.projektTodos.length > 0) {
+      p.projektTodos.forEach(todo => {
+        if (todo.klar) return;
+        if (katFilter && p.kategori !== katFilter) return;
+        const d = todo.datum ? Math.round((new Date(todo.datum) - new Date()) / 86400000) : null;
+        uppgifter.push({
+          id: `todo-${p.id}-${todo.id}`, projekt: p, typ: "todo",
+          ikon: "☑️", label: todo.text,
+          detalj: p.namn,
+          dagar: d, sortera: d !== null ? d : 9998,
+        });
+      });
+    }
+
     // Frakt: ska vara bokad senast 3 dagar innan färdigdag
     if (p.status === "order" && p.fraktSkaBokas && !p.fraktBokad && p.fardigDag) {
       const fardig = new Date(p.fardigDag);
@@ -1340,6 +1414,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter }) => {
     ue:         { color: "#5B21B6", bg: "#EDE9FE" },
     produktion: { color: "#065F46", bg: "#D1FAE5" },
     frakt:      { color: "#1E40AF", bg: "#DBEAFE" },
+    todo:       { color: "#374151", bg: "#F3F4F6" },
   };
 
   return (
@@ -1634,7 +1709,8 @@ export default function App() {
               ))}
               <Field label="Värde (kr)"><input type="number" defaultValue={selected.värde} style={inputSt} onChange={e => setSelected(s => ({ ...s, värde: Number(e.target.value) }))} /></Field>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <ProjektTodosPanel todos={selected.projektTodos || []} onChange={v => setSelected(s => ({ ...s, projektTodos: v }))} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
               <button onClick={() => deleteProject(selected.id)} style={{ background: "none", color: C.red, border: "none", cursor: "pointer", fontWeight: 600 }}>Ta bort</button>
               <div style={{ display: "flex", gap: 8 }}>
                 {selected.status === "kalkyl" && (
