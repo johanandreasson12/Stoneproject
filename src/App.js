@@ -1655,8 +1655,8 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
                 </div>
                 {/* Knappar – UTANFÖR klickbar del */}
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7")} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
-                  <button onClick={() => onIgnorera && onIgnorera(u.projekt, nyckel, "permanent")} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
+                  <button onClick={() => { alert("snooze: " + nyckel); onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
+                  <button onClick={() => { alert("ignorera: " + nyckel); onIgnorera && onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
                 </div>
               </div>
             );
