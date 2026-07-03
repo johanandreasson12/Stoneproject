@@ -1383,11 +1383,9 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
 
 
 
-  const arIgnorerad = (projektId, nyckel) => {
-    if (!nyckel) return false;
-    const p = projects.find(pr => pr.id === projektId);
-    if (!p) return false;
-    const val = (p.ignoreradeTodos || {})[nyckel];
+  const arIgnorerad = (projekt, nyckel) => {
+    if (!nyckel || !projekt) return false;
+    const val = (projekt.ignoreradeTodos || {})[nyckel];
     if (!val) return false;
     if (val === "permanent") return true;
     // Snoozed items still show in list - only hide if permanent
@@ -1400,7 +1398,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     // Kalkyl-deadline
     if (p.status === "kalkyl" && p.kalkylDeadline) {
       const d = dagnarKvar(p.kalkylDeadline);
-      if (!arIgnorerad(p.id, "kalkyl")) uppgifter.push({
+      if (!arIgnorerad(p, "kalkyl")) uppgifter.push({
         id: `kalkyl-${p.id}`, projekt: p, typ: "kalkyl",
         ikon: "🧮", label: "Offert ska räknas klart",
         detalj: `Deadline: ${p.kalkylDeadline}`,
@@ -1639,7 +1637,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
 
   // Filter out permanently ignored items, update sortera for snoozed items
   const visaUppgifter = uppgifter
-    .filter(u => !arIgnorerad(u.projekt.id, u.ignoreraNyckel))
+    .filter(u => !arIgnorerad(u.projekt, u.ignoreraNyckel))
     .map(u => {
       const val = (u.projekt.ignoreradeTodos || {})[u.ignoreraNyckel];
       if (val && val !== "permanent") {
