@@ -630,6 +630,14 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
         <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Baskort */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Kund"><input value={f.namn} onChange={e => set("namn", e.target.value)} style={inputSt} /></Field>
+            <Field label="Produkt"><input value={f.produkt} onChange={e => set("produkt", e.target.value)} style={inputSt} /></Field>
+            <Field label="Värde (kr)"><input type="number" value={f.värde} onChange={e => set("värde", Number(e.target.value))} style={inputSt} /></Field>
+            <Field label="Kategori">
+              <select value={f.kategori} onChange={e => set("kategori", e.target.value)} style={selectSt}>
+                {KATEGORIER.map(k => <option key={k} value={k}>{KAT_META[k].label}</option>)}
+              </select>
+            </Field>
             <Field label="Fortnox-ordernummer"><input value={f.orderNummer || ""} onChange={e => set("orderNummer", e.target.value)} style={inputSt} /></Field>
             <Field label="Material"><input value={f.material || ""} onChange={e => set("material", e.target.value)} style={inputSt} /></Field>
             <Field label="Producent">
@@ -1647,7 +1655,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: tf.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{u.ikon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: tf.color, marginBottom: 1 }}>{u.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{u.projekt.namn}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{u.projekt.namn} <span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>#{u.projekt.referens}</span></div>
                     <div style={{ fontSize: 11, color: C.muted }}>{u.detalj}</div>
                   </div>
                   <KategoriChip kategori={u.projekt.kategori} />
