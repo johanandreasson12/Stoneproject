@@ -289,7 +289,11 @@ const KalenderVäljare = ({ value, onChange, placeholder }) => {
   };
 
   const välj = (datum) => {
-    onChange(datum.toISOString().slice(0, 10));
+    // Use local date to avoid timezone offset issues
+    const år = datum.getFullYear();
+    const mån = String(datum.getMonth() + 1).padStart(2, "0");
+    const dag = String(datum.getDate()).padStart(2, "0");
+    onChange(`${år}-${mån}-${dag}`);
     setOpen(false);
   };
 
