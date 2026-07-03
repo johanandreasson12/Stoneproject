@@ -259,6 +259,132 @@ const Field = ({ label, children }) => (
 const inputSt = { border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 14, fontFamily: "inherit", outline: "none", color: C.text, background: C.surface };
 const selectSt = { ...inputSt, cursor: "pointer" };
 
+
+// ── KALENDER MED VECKONUMMER ──────────────────────────────────────────────────
+const getVecka = (datum) => {
+  const d = new Date(datum);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const vecka1 = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d - vecka1) / 86400000 - 3 + (vecka1.getDay() + 6) % 7) / 7);
+};
+
+const KalenderVäljare = ({ value, onChange, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  const [visar, setVisar] = useState(() => {
+    const d = value ? new Date(value) : new Date();
+    return { år: d.getFullYear(), månad: d.getMonth() };
+  });
+
+  const valtDatum = value ? new Date(value) : null;
+  const idag = new Date();
+  idag.setHours(0,0,0,0);
+
+  const gåTill = (delta) => {
+    let { år, månad } = visar;
+    månad += delta;
+    if (månad > 11) { månad = 0; år++; }
+    if (månad < 0) { månad = 11; år--; }
+    setVisar({ år, månad });
+  };
+
+  const välj = (datum) => {
+    onChange(datum.toISOString().slice(0, 10));
+    setOpen(false);
+  };
+
+  const byggKalendern = () => {
+    const { år, månad } = visar;
+    const förstaDagen = new Date(år, månad, 1);
+    const sistaD = new Date(år, månad + 1, 0).getDate();
+    // Start from Monday
+    let startDag = (förstaDagen.getDay() + 6) % 7;
+    
+    const dagar = [];
+    // Fill in days from previous month
+    for (let i = 0; i < startDag; i++) {
+      const d = new Date(år, månad, 1 - startDag + i);
+      dagar.push({ datum: d, annanMånad: true });
+    }
+    for (let i = 1; i <= sistaD; i++) {
+      dagar.push({ datum: new Date(år, månad, i), annanMånad: false });
+    }
+    // Fill to complete last row
+    while (dagar.length % 7 !== 0) {
+      const d = new Date(år, månad + 1, dagar.length - sistaD - startDag + 1);
+      dagar.push({ datum: d, annanMånad: true });
+    }
+    return dagar;
+  };
+
+  const månadsNamn = ["Januari","Februari","Mars","April","Maj","Juni","Juli","Augusti","September","Oktober","November","December"];
+  const dagNamn = ["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+
+  const dagar = byggKalendern();
+  const rader = [];
+  for (let i = 0; i < dagar.length; i += 7) rader.push(dagar.slice(i, i + 7));
+
+  const visaDatum = value ? new Date(value).toLocaleDateString("sv-SE") : "";
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ ...inputSt, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
+        <span style={{ color: value ? C.text : C.muted }}>{visaDatum || placeholder || "Välj datum"}</span>
+        <span style={{ fontSize: 12, color: C.muted }}>📅</span>
+      </div>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", padding: 12, minWidth: 300 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button onClick={() => gåTill(-1)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: C.muted, padding: "2px 6px" }}>‹</button>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{månadsNamn[visar.månad]} {visar.år}</span>
+            <button onClick={() => gåTill(1)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: C.muted, padding: "2px 6px" }}>›</button>
+          </div>
+          {/* Dag-headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "32px repeat(7, 1fr)", gap: 1, marginBottom: 2 }}>
+            <div style={{ fontSize: 10, color: C.muted, textAlign: "center", fontWeight: 700 }}>v.</div>
+            {dagNamn.map(d => <div key={d} style={{ fontSize: 10, color: C.muted, textAlign: "center", fontWeight: 700 }}>{d}</div>)}
+          </div>
+          {/* Rader */}
+          {rader.map((rad, ri) => {
+            const vecka = getVecka(rad[0].datum);
+            return (
+              <div key={ri} style={{ display: "grid", gridTemplateColumns: "32px repeat(7, 1fr)", gap: 1, marginBottom: 1 }}>
+                <div style={{ fontSize: 10, color: C.accent, textAlign: "center", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{vecka}</div>
+                {rad.map((dag, di) => {
+                  const ärVald = valtDatum && dag.datum.toDateString() === valtDatum.toDateString();
+                  const ärIdag = dag.datum.toDateString() === idag.toDateString();
+                  return (
+                    <div key={di} onClick={() => välj(dag.datum)} style={{
+                      textAlign: "center", padding: "5px 2px", borderRadius: 6, cursor: "pointer",
+                      fontSize: 12, fontWeight: ärVald ? 700 : 400,
+                      background: ärVald ? C.accent : ärIdag ? C.accentLight : "transparent",
+                      color: ärVald ? "#fff" : dag.annanMånad ? C.border : C.text,
+                      transition: "background 0.1s",
+                    }}
+                      onMouseEnter={e => { if (!ärVald) e.currentTarget.style.background = C.grayLight; }}
+                      onMouseLeave={e => { if (!ärVald) e.currentTarget.style.background = ärIdag ? C.accentLight : "transparent"; }}
+                    >
+                      {dag.datum.getDate()}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {/* Rensa */}
+          {value && (
+            <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+              <button onClick={() => { onChange(""); setOpen(false); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.muted }}>Rensa</button>
+              <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.accent, fontWeight: 600 }}>Stäng</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Section = ({ title, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>{title}</div>
@@ -497,7 +623,7 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
               </Field>
             )}
             <Field label="Preliminärt datum för mätning">
-              <input type="date" value={f.prelimDatumMätning} onChange={e => set("prelimDatumMätning", e.target.value)} style={inputSt} />
+              <KalenderVäljare value={f.prelimDatumMätning} onChange={v => set("prelimDatumMätning", v)} />
             </Field>
           </Section>
 
@@ -519,7 +645,7 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
               </Field>
             )}
             <Field label="Preliminärt datum för leverans">
-              <input type="date" value={f.prelimDatumLeverans} onChange={e => set("prelimDatumLeverans", e.target.value)} style={inputSt} />
+              <KalenderVäljare value={f.prelimDatumLeverans} onChange={v => set("prelimDatumLeverans", v)} />
             </Field>
           </Section>
 
@@ -666,10 +792,10 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   </select>
                 </Field>
               )}
-              <Field label="Preliminärt datum"><input type="date" value={f.prelimDatumMätning || ""} onChange={e => set("prelimDatumMätning", e.target.value)} style={inputSt} /></Field>
+              <Field label="Preliminärt datum"><KalenderVäljare value={f.prelimDatumMätning || ""} onChange={v => set("prelimDatumMätning", v)} /></Field>
               {f.mätningstyp === "kontrollmätas" && (
                 <Field label="Bekräftat datum för mätning">
-                  <input type="date" value={f.bekraftadMatningDatum || ""} onChange={e => set("bekraftadMatningDatum", e.target.value)} style={inputSt} />
+                  <KalenderVäljare value={f.bekraftadMatningDatum || ""} onChange={v => set("bekraftadMatningDatum", v)} />
                 </Field>
               )}
               {f.mätningstyp === "kontrollmätas" && f.mätningUE && (
@@ -700,10 +826,10 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   </select>
                 </Field>
               )}
-              <Field label="Preliminärt datum"><input type="date" value={f.prelimDatumLeverans || ""} onChange={e => set("prelimDatumLeverans", e.target.value)} style={inputSt} /></Field>
+              <Field label="Preliminärt datum"><KalenderVäljare value={f.prelimDatumLeverans || ""} onChange={v => set("prelimDatumLeverans", v)} /></Field>
               {f.leveranstyp === "installeras_av_oss" && (
                 <Field label="Bekräftat datum för installation">
-                  <input type="date" value={f.bekraftadInstallationDatum || ""} onChange={e => set("bekraftadInstallationDatum", e.target.value)} style={inputSt} />
+                  <KalenderVäljare value={f.bekraftadInstallationDatum || ""} onChange={v => set("bekraftadInstallationDatum", v)} />
                 </Field>
               )}
               {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
