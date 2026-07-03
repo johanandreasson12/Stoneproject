@@ -195,17 +195,23 @@ const attestBelopp = (p, key) => {
 };
 const inköpBelopp = (p, key, budget) => attestBelopp(p, key) !== null ? attestBelopp(p, key) : (Number(budget) || 0);
 
+const ärAttesterad = (p, key) => {
+  const a = (p.attester || {})[key];
+  return a && a.attesterad;
+};
+
 const beraknaKostnad = (p) => {
+  // Only count non-attested costs (attested = already paid/gone)
   return (
-    inköpBelopp(p, "sten", p.leverantörInköpspris) +
-    inköpBelopp(p, "vask", p.vaskInköpspris) +
-    inköpBelopp(p, "frakt", p.fraktKostnad) +
-    inköpBelopp(p, "uematning", p.ueMatningKostnad) +
-    inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad)
+    (ärAttesterad(p, "sten") ? 0 : inköpBelopp(p, "sten", p.leverantörInköpspris)) +
+    (ärAttesterad(p, "vask") ? 0 : inköpBelopp(p, "vask", p.vaskInköpspris)) +
+    (ärAttesterad(p, "frakt") ? 0 : inköpBelopp(p, "frakt", p.fraktKostnad)) +
+    (ärAttesterad(p, "uematning") ? 0 : inköpBelopp(p, "uematning", p.ueMatningKostnad)) +
+    (ärAttesterad(p, "ueinstallation") ? 0 : inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad))
   );
 };
 
-const beraknaTB = (p) => (p.värde || 0) - beraknaKostnad(p);
+const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
@@ -1241,7 +1247,10 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning }) => (
           )}
           <div style={{ display: "flex", alignItems: "center" }}><KategoriChip kategori={p.kategori} /></div>
           <div style={{ display: "flex", alignItems: "center" }}><StatusBadge status={p.status} /></div>
-          <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{SEK(p.värde)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", flexDirection: "column" }}>
+            <span>{SEK(kvarstående(p))}</span>
+            {delfakturerat(p) > 0 && <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>av {SEK(p.värde)}</span>}
+          </div>
         </div>
       );
     })}
@@ -1891,7 +1900,8 @@ export default function App() {
       return !q || sök(p.namn) || sök(p.produkt) || sök(p.referens) || sök(p.orderNummer) || sök(p.material) || sök(p.notat) || sök(p.ansvarig) || sök(p.leverantörOrdernummer) || sök(p.vaskOrdernummer) || sök(p.fraktOrdernummer);
     });
 
-  const totalVärde = filtered.reduce((s, p) => s + (p.värde || 0), 0);
+  const totalVärde = filtered.reduce((s, p) => s + kvarstående(p), 0);
+  const totalUrsprung = filtered.reduce((s, p) => s + (p.värde || 0), 0);
   const totalKvarstaende = filtered.reduce((s, p) => s + kvarstående(p), 0);
   const counts = Object.fromEntries(Object.keys(STATUS_META).map(k => [k, projects.filter(p => p.status === k).length]));
 
