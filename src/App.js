@@ -1659,22 +1659,17 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
       }
     }
 
-    // Bekräfta färdigdag: inom 5 arbetsdagar efter att ordern gick till produktion
-    if (p.status === "order" && p.orderstatus === "i_produktion" && p.produktionStartDatum && !p.fardigDag) {
-      const start = new Date(p.produktionStartDatum);
-      // Räkna 5 arbetsdagar
-      let arbetsdagar = 0;
-      const deadline = new Date(start);
-      while (arbetsdagar < 5) {
-        deadline.setDate(deadline.getDate() + 1);
-        const dag = deadline.getDay();
-        if (dag !== 0 && dag !== 6) arbetsdagar++;
-      }
+    // Bekräfta färdigdag: 3 dagar innan leverans för Landernäs, 10 dagar för övriga
+    if (p.status === "order" && p.orderstatus === "i_produktion" && p.prelimDatumLeverans && !p.fardigDag) {
+      const dagarInnan = p.producent === "Landernäs" ? 3 : 10;
+      const levDatum = new Date(p.prelimDatumLeverans);
+      const deadline = new Date(levDatum);
+      deadline.setDate(deadline.getDate() - dagarInnan);
       const d = Math.round((deadline - new Date()) / 86400000);
       uppgifter.push({
         id: `fardigdag-${p.id}`, projekt: p, typ: "produktion",
         ikon: "📅", label: "Bekräfta dag när ordern är färdig från produktion", ignoreraNyckel: "fardigdag",
-        detalj: `Order i produktion sedan ${p.produktionStartDatum} – svar senast ${deadline.toLocaleDateString("sv-SE")}`,
+        detalj: `Senast ${deadline.toLocaleDateString("sv-SE")} (${dagarInnan} dagar före leverans ${p.prelimDatumLeverans})`,
         dagar: d, sortera: d,
       });
     }
