@@ -1637,8 +1637,18 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     }
   });
 
-  // Filter out ignored/snoozed items
-  const visaUppgifter = uppgifter.filter(u => !arIgnorerad(u.projekt.id, u.ignoreraNyckel));
+  // Filter out permanently ignored items, update sortera for snoozed items
+  const visaUppgifter = uppgifter
+    .filter(u => !arIgnorerad(u.projekt.id, u.ignoreraNyckel))
+    .map(u => {
+      const val = (u.projekt.ignoreradeTodos || {})[u.ignoreraNyckel];
+      if (val && val !== "permanent") {
+        // Snoozed - sort by snooze date
+        const d = Math.round((new Date(val) - new Date()) / 86400000);
+        return { ...u, sortera: d };
+      }
+      return u;
+    });
   visaUppgifter.sort((a, b) => a.sortera - b.sortera);
 
   const TYP_FARG = {
