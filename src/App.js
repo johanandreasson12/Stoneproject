@@ -1836,7 +1836,12 @@ export default function App() {
     }
     const nyIgnorade = { ...(projekt.ignoreradeTodos || {}), [nyckel]: snoozeDate };
     setProjects(ps => ps.map(p => p.id === projekt.id ? { ...p, ignoreradeTodos: nyIgnorade } : p));
-    await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
+    const { error } = await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
+    if (error) {
+      alert("Fel vid sparning: " + error.message);
+    } else {
+      console.log("Sparad:", nyckel, snoozeDate);
+    }
   };
 
   if (loading) return (
