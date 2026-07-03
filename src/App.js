@@ -1331,6 +1331,49 @@ const ProjektTodosPanel = ({ todos, onChange }) => {
   );
 };
 
+
+// ── SNOOZE-KNAPPAR ───────────────────────────────────────────────────────────
+const SnoozeKnappar = ({ nyckel, projekt, onIgnorera }) => {
+  const [open, setOpen] = useState(false);
+  const [dagar, setDagar] = useState(7);
+
+  const snooze = () => {
+    if (onIgnorera) onIgnorera(projekt, nyckel, `snooze${dagar}`);
+    setOpen(false);
+  };
+
+  // Check if currently snoozed
+  const val = (projekt.ignoreradeTodos || {})[nyckel];
+  const isSnoozed = val && val !== "permanent" && val > new Date().toISOString().slice(0,10);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
+      {isSnoozed && (
+        <span style={{ fontSize: 10, color: C.orange, fontWeight: 600, whiteSpace: "nowrap" }}>💤 {val}</span>
+      )}
+      <button onClick={() => setOpen(o => !o)} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
+      <button onClick={() => onIgnorera && onIgnorera(projekt, nyckel, "permanent")} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: 36, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, zIndex: 50, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", gap: 8, minWidth: 180 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.muted }}>Skjut upp</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="number" min={1} max={90} value={dagar} onChange={e => setDagar(Number(e.target.value))} style={{ ...inputSt, width: 60, padding: "6px 8px" }} />
+            <span style={{ fontSize: 13, color: C.muted }}>dagar</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[1, 3, 7, 14].map(d => (
+              <button key={d} onClick={() => setDagar(d)} style={{ background: dagar === d ? C.accentLight : C.grayLight, border: `1px solid ${dagar === d ? C.accent : C.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, color: dagar === d ? C.accent : C.muted, fontWeight: 600 }}>{d}d</button>
+            ))}
+          </div>
+          <button onClick={snooze} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+            Skjut upp {dagar} dagar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── ATT-GÖRA PANEL ───────────────────────────────────────────────────────────
 const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
   const [katFilter, setKatFilter] = useState(kategoriFilter || null);
@@ -1347,7 +1390,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     const val = (p.ignoreradeTodos || {})[nyckel];
     if (!val) return false;
     if (val === "permanent") return true;
-    if (val > today()) return true;
+    // Snoozed items still show in list - only hide if permanent
     return false;
   };
 
@@ -1665,10 +1708,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
                   <div style={{ minWidth: 60, textAlign: "right" }}>{tidsstatus}</div>
                 </div>
                 {/* Knappar – UTANFÖR klickbar del */}
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => { onIgnorera && onIgnorera(u.projekt, nyckel, "snooze7"); }} style={{ background: C.orangeLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.orange }}>💤</button>
-                  <button onClick={() => { onIgnorera && onIgnorera(u.projekt, nyckel, "permanent"); }} style={{ background: C.grayLight, border: "none", borderRadius: 6, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.muted, fontWeight: 700 }}>✕</button>
-                </div>
+                <SnoozeKnappar nyckel={nyckel} projekt={u.projekt} onIgnorera={onIgnorera} />
               </div>
             );
           })}
@@ -1777,7 +1817,13 @@ export default function App() {
 
   const ignoreraTodo = async (projekt, nyckel, typ) => {
     if (!nyckel || !projekt) return;
-    const snoozeDate = typ === "snooze7" ? new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10) : "permanent";
+    let snoozeDate;
+    if (typ === "permanent") {
+      snoozeDate = "permanent";
+    } else {
+      const days = parseInt(typ.replace("snooze", "")) || 7;
+      snoozeDate = new Date(Date.now() + days*24*60*60*1000).toISOString().slice(0,10);
+    }
     const nyIgnorade = { ...(projekt.ignoreradeTodos || {}), [nyckel]: snoozeDate };
     setProjects(ps => ps.map(p => p.id === projekt.id ? { ...p, ignoreradeTodos: nyIgnorade } : p));
     await sb.from("projects").update({ ignorerade_todos: nyIgnorade }).eq("id", projekt.id);
