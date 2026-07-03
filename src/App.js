@@ -1378,7 +1378,9 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     }
 
     // Leverans (order med preliminär vecka)
-    if (p.status === "order" && p.prelimVeckaLeverans) {
+    const leveransKlar = ["pagaende_installation", "installerad"].includes(p.orderstatus);
+    const installationBekraftad = p.leveranstyp === "installeras_av_oss" && p.bekraftadInstallationDatum;
+    if (p.status === "order" && p.prelimVeckaLeverans && !leveransKlar && !installationBekraftad) {
       const v = veckarKvar(p.prelimVeckaLeverans);
       uppgifter.push({
         id: `leverans-${p.id}`, projekt: p, typ: "leverans",
