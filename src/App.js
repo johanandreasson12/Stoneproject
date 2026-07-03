@@ -1887,7 +1887,8 @@ export default function App() {
     .filter(p => kategoriFilter ? p.kategori === kategoriFilter : true)
     .filter(p => {
       const q = search.toLowerCase();
-      return !q || p.namn.toLowerCase().includes(q) || p.produkt.toLowerCase().includes(q) || p.referens.toLowerCase().includes(q);
+      const sök = (v) => v && String(v).toLowerCase().includes(q);
+      return !q || sök(p.namn) || sök(p.produkt) || sök(p.referens) || sök(p.orderNummer) || sök(p.material) || sök(p.notat) || sök(p.ansvarig) || sök(p.leverantörOrdernummer) || sök(p.vaskOrdernummer) || sök(p.fraktOrdernummer);
     });
 
   const totalVärde = filtered.reduce((s, p) => s + (p.värde || 0), 0);
