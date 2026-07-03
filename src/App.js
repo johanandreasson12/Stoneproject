@@ -31,13 +31,13 @@ const toDb = (p) => ({
   matning_ue: p.mätningUE || false,
   matning_ue_order_skickad: p.mätningUEOrderSkickad || false,
   ue_matning_kostnad: p.ueMatningKostnad || null,
-  prelim_vecka_matning: p.prelimVeckaMätning || null,
+  prelim_datum_matning: p.prelimDatumMätning || null,
   bekraftad_matning_datum: p.bekraftadMatningDatum || null,
   leveranstyp: p.leveranstyp || null,
   leverans_ue: p.leveransUE || false,
   installation_ue_order_skickad: p.installationUEOrderSkickad || false,
   ue_installation_kostnad: p.ueInstallationKostnad || null,
-  prelim_vecka_leverans: p.prelimVeckaLeverans || null,
+  prelim_datum_leverans: p.prelimDatumLeverans || null,
   bekraftad_installation_datum: p.bekraftadInstallationDatum || null,
   producent: p.producent || null,
   har_vask: p.harVask || false,
@@ -96,13 +96,13 @@ const fromDb = (r) => ({
   mätningUE: r.matning_ue || false,
   mätningUEOrderSkickad: r.matning_ue_order_skickad || false,
   ueMatningKostnad: r.ue_matning_kostnad || "",
-  prelimVeckaMätning: r.prelim_vecka_matning || "",
+  prelimDatumMätning: r.prelim_datum_matning || "",
   bekraftadMatningDatum: r.bekraftad_matning_datum || "",
   leveranstyp: r.leveranstyp || "skickas_till_kund",
   leveransUE: r.leverans_ue || false,
   installationUEOrderSkickad: r.installation_ue_order_skickad || false,
   ueInstallationKostnad: r.ue_installation_kostnad || "",
-  prelimVeckaLeverans: r.prelim_vecka_leverans || "",
+  prelimDatumLeverans: r.prelim_datum_leverans || "",
   bekraftadInstallationDatum: r.bekraftad_installation_datum || "",
   producent: r.producent || "Cosentino",
   harVask: r.har_vask || false,
@@ -420,10 +420,10 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
     material: "",
     mätningstyp: "färdiga_mått",
     mätningUE: false,
-    prelimVeckaMätning: "",
+    prelimDatumMätning: "",
     leveranstyp: "skickas_till_kund",
     leveransUE: false,
-    prelimVeckaLeverans: "",
+    prelimDatumLeverans: "",
     producent: "Cosentino",
     harVask: false,
     vaskTillhandahåller: "vi",
@@ -496,8 +496,8 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
                 </select>
               </Field>
             )}
-            <Field label="Preliminär vecka för mätning">
-              <input value={f.prelimVeckaMätning} onChange={e => set("prelimVeckaMätning", e.target.value)} placeholder="t.ex. 28" style={inputSt} />
+            <Field label="Preliminärt datum för mätning">
+              <input type="date" value={f.prelimDatumMätning} onChange={e => set("prelimDatumMätning", e.target.value)} style={inputSt} />
             </Field>
           </Section>
 
@@ -518,8 +518,8 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
                 </select>
               </Field>
             )}
-            <Field label="Preliminär vecka för leverans">
-              <input value={f.prelimVeckaLeverans} onChange={e => set("prelimVeckaLeverans", e.target.value)} placeholder="t.ex. 30" style={inputSt} />
+            <Field label="Preliminärt datum för leverans">
+              <input type="date" value={f.prelimDatumLeverans} onChange={e => set("prelimDatumLeverans", e.target.value)} style={inputSt} />
             </Field>
           </Section>
 
@@ -666,7 +666,7 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   </select>
                 </Field>
               )}
-              <Field label="Preliminär vecka"><input value={f.prelimVeckaMätning || ""} onChange={e => set("prelimVeckaMätning", e.target.value)} placeholder="v." style={inputSt} /></Field>
+              <Field label="Preliminärt datum"><input type="date" value={f.prelimDatumMätning || ""} onChange={e => set("prelimDatumMätning", e.target.value)} style={inputSt} /></Field>
               {f.mätningstyp === "kontrollmätas" && (
                 <Field label="Bekräftat datum för mätning">
                   <input type="date" value={f.bekraftadMatningDatum || ""} onChange={e => set("bekraftadMatningDatum", e.target.value)} style={inputSt} />
@@ -700,7 +700,7 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   </select>
                 </Field>
               )}
-              <Field label="Preliminär vecka"><input value={f.prelimVeckaLeverans || ""} onChange={e => set("prelimVeckaLeverans", e.target.value)} placeholder="v." style={inputSt} /></Field>
+              <Field label="Preliminärt datum"><input type="date" value={f.prelimDatumLeverans || ""} onChange={e => set("prelimDatumLeverans", e.target.value)} style={inputSt} /></Field>
               {f.leveranstyp === "installeras_av_oss" && (
                 <Field label="Bekräftat datum för installation">
                   <input type="date" value={f.bekraftadInstallationDatum || ""} onChange={e => set("bekraftadInstallationDatum", e.target.value)} style={inputSt} />
@@ -1421,13 +1421,13 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     // Leverans (order med preliminär vecka)
     const leveransKlar = ["pagaende_installation", "installerad"].includes(p.orderstatus);
     const installationBekraftad = p.leveranstyp === "installeras_av_oss" && p.bekraftadInstallationDatum;
-    if (p.status === "order" && p.prelimVeckaLeverans && !leveransKlar && !installationBekraftad) {
-      const v = veckarKvar(p.prelimVeckaLeverans);
+    if (p.status === "order" && p.prelimDatumLeverans && !leveransKlar && !installationBekraftad) {
+      const d = dagnarKvar(p.prelimDatumLeverans);
       uppgifter.push({
         id: `leverans-${p.id}`, projekt: p, typ: "leverans",
         ikon: "🚚", label: "Leverans",
-        ignoreraNyckel: "leverans", detalj: `v.${p.prelimVeckaLeverans}${p.leveranstyp === "installeras_av_oss" ? (p.leveransUE ? " · Installation (UE)" : " · Installation (vi)") : p.leveranstyp === "avhämtas" ? " · Avhämtas" : " · Skickas"}`,
-        dagar: v !== null ? v * 7 : null, sortera: v !== null ? v * 7 : 9999,
+        ignoreraNyckel: "leverans", detalj: `${p.prelimDatumLeverans}${p.leveranstyp === "installeras_av_oss" ? (p.leveransUE ? " · Installation (UE)" : " · Installation (vi)") : p.leveranstyp === "avhämtas" ? " · Avhämtas" : " · Skickas"}`,
+        dagar: d, sortera: d ?? 9999,
       });
     }
 
@@ -1697,7 +1697,7 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
               : u.dagar < 0 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>{Math.abs(u.dagar)}d sen</span>
               : u.dagar === 0 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>Idag!</span>
               : u.dagar <= 7 ? <span style={{ fontSize: 11, fontWeight: 700, color: C.orange }}>Om {u.dagar}d</span>
-              : <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>v.{u.projekt.prelimVeckaLeverans || u.projekt.prelimVeckaMätning || "?"}</span>;
+              : <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>Om {u.dagar}d</span>;
             return (
               <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: i < visaUppgifter.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
                 onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
