@@ -1572,12 +1572,16 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
 
     // Vaskorder ej skickad
     if (p.status === "order" && p.harVask && p.vaskTillhandahåller === "vi" && !p.vaskOrderSkickad) {
-      uppgifter.push({
-        id: `vask-${p.id}`, projekt: p, typ: "vask",
-        ikon: "🪣", label: "Vaskorder ej skickad till leverantör", ignoreraNyckel: "vask_order",
-        detalj: p.vaskModell || "Modell ej angiven",
-        dagar: null, sortera: -1,
-      });
+      const dTillMätning = p.prelimDatumMätning ? dagnarKvar(p.prelimDatumMätning) : null;
+      // Visa bara om inget mätningsdatum är satt, eller om mätningsdatumet är idag eller passerat
+      if (dTillMätning === null || dTillMätning <= 0) {
+        uppgifter.push({
+          id: `vask-${p.id}`, projekt: p, typ: "vask",
+          ikon: "🪣", label: "Vaskorder ej skickad till leverantör", ignoreraNyckel: "vask_order",
+          detalj: p.vaskModell || "Modell ej angiven",
+          dagar: null, sortera: -1,
+        });
+      }
     }
 
     // Order ej skickad till stenleverantör
