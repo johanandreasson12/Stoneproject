@@ -195,6 +195,18 @@ const attestBelopp = (p, key) => {
 };
 const inköpBelopp = (p, key, budget) => attestBelopp(p, key) !== null ? attestBelopp(p, key) : (Number(budget) || 0);
 
+const allaKostnaderAttesterade = (p) => {
+  const poster = [
+    p.leverantörInköpspris && "sten",
+    p.vaskInköpspris && p.harVask && p.vaskTillhandahåller === "vi" && "vask",
+    p.fraktKostnad && p.fraktSkaBokas && "frakt",
+    p.ueMatningKostnad && p.mätningUE && "uematning",
+    p.ueInstallationKostnad && p.leveransUE && "ueinstallation",
+  ].filter(Boolean);
+  if (poster.length === 0) return null; // inga kostnader alls
+  return poster.every(key => ärAttesterad(p, key));
+};
+
 const ärAttesterad = (p, key) => {
   const a = (p.attester || {})[key];
   return a && a.attesterad;
@@ -1122,9 +1134,11 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       <Cell width={100}>{p.bekraftadInstallationDatum || p.fardigDag || "–"}</Cell>
                       <div style={{ width: 55, minWidth: 55, textAlign: "center" }}>{vaskDisplay(p)}</div>
                       <div style={{ width: 60, minWidth: 60, textAlign: "center" }}>
-                        {p.harVask && p.vaskTillhandahåller === "vi"
-                          ? ja(p.vaskOrderSkickad)
-                          : ja(p.orderSkickadLeverantör)}
+                        {p.harVask && p.vaskTillhandahåller === "kund"
+                          ? <span style={{ color: C.muted }}>––</span>
+                          : p.harVask && p.vaskTillhandahåller === "vi"
+                            ? ja(p.vaskOrderSkickad)
+                            : ja(p.orderSkickadLeverantör)}
                       </div>
                       <div style={{ flex: 1 }} />
                       <div style={{ width: 110, minWidth: 110 }}><KategoriChip kategori={p.kategori} /></div>
@@ -1310,10 +1324,10 @@ const NyProjektModal = ({ onClose, onSave, onSaveAndOrder, nextNummer, defaultSt
 };
 
 // ── GENERISK PROJEKTTABELL ───────────────────────────────────────────────────
-const ProjektTabell = ({ projects, onOpen, showUppfoljning }) => (
+const ProjektTabell = ({ projects, onOpen, showUppfoljning, showAttest }) => (
   <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
-    <div style={{ display: "grid", gridTemplateColumns: showUppfoljning ? "0.7fr 1.2fr 1.1fr 90px 100px 90px 80px" : "0.7fr 1.2fr 1.1fr 100px 90px 80px", borderBottom: `1px solid ${C.border}`, padding: "10px 16px", background: C.grayLight }}>
-      {["Referens", "Kund", "Produkt", showUppfoljning ? "Uppföljning" : null, "Kategori", "Status", "Värde"].filter(Boolean).map(h => (
+    <div style={{ display: "grid", gridTemplateColumns: showUppfoljning ? "0.7fr 1.2fr 1.1fr 90px 100px 90px 80px" : showAttest ? "0.7fr 1.2fr 1.1fr 80px 100px 90px 80px" : "0.7fr 1.2fr 1.1fr 100px 90px 80px", borderBottom: `1px solid ${C.border}`, padding: "10px 16px", background: C.grayLight }}>
+      {["Referens", "Kund", "Produkt", showUppfoljning ? "Uppföljning" : null, showAttest ? "Kostnader" : null, "Kategori", "Status", "Värde"].filter(Boolean).map(h => (
         <div key={h} style={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.5, textTransform: "uppercase" }}>{h}</div>
       ))}
     </div>
@@ -1323,7 +1337,7 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning }) => (
       const dagar = p.uppföljningsDatum ? Math.round((new Date(p.uppföljningsDatum) - new Date()) / 86400000) : null;
       const uppfColor = dagar === null ? C.muted : dagar < 0 ? C.red : dagar <= 2 ? C.orange : C.green;
       return (
-        <div key={p.id} onClick={() => onOpen(p)} style={{ display: "grid", gridTemplateColumns: showUppfoljning ? "0.7fr 1.2fr 1.1fr 90px 100px 90px 80px" : "0.7fr 1.2fr 1.1fr 100px 90px 80px", padding: "12px 16px", cursor: "pointer", borderBottom: i < projects.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
+        <div key={p.id} onClick={() => onOpen(p)} style={{ display: "grid", gridTemplateColumns: showUppfoljning ? "0.7fr 1.2fr 1.1fr 90px 100px 90px 80px" : showAttest ? "0.7fr 1.2fr 1.1fr 80px 100px 90px 80px" : "0.7fr 1.2fr 1.1fr 100px 90px 80px", padding: "12px 16px", cursor: "pointer", borderBottom: i < projects.length - 1 ? `1px solid ${C.border}` : "none", background: "transparent", transition: "background 0.1s" }}
           onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
           <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: "flex", alignItems: "center" }}>
@@ -1340,6 +1354,12 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning }) => (
               {dagar !== null ? <span style={{ fontSize: 11, fontWeight: 700, color: uppfColor }}>{dagar < 0 ? `${Math.abs(dagar)}d sen` : dagar === 0 ? "Idag" : `${dagar}d`}</span> : <span style={{ fontSize: 11, color: C.muted }}>—</span>}
             </div>
           )}
+          {showAttest && (() => {
+            const status = allaKostnaderAttesterade(p);
+            if (status === null) return <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, color: C.muted }}>–</span></div>;
+            if (status) return <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>✓ Klart</span></div>;
+            return <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, fontWeight: 700, color: C.orange }}>⏳ Väntar</span></div>;
+          })()}
           <div style={{ display: "flex", alignItems: "center" }}><KategoriChip kategori={p.kategori} /></div>
           <div style={{ display: "flex", alignItems: "center" }}><StatusBadge status={p.status} /></div>
           <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", flexDirection: "column" }}>
@@ -2171,7 +2191,7 @@ export default function App() {
           {activePage === "alla" && <AtterGoraPanel projects={projects} onOpen={openProject} kategoriFilter={kategoriFilter} onIgnorera={ignoreraTodo} />}
           {activePage === "order"
             ? <OrderPlaneringsvyn projects={filtered} onOpen={openProject} />
-            : <ProjektTabell projects={filtered} onOpen={openProject} showUppfoljning={activePage === "offert" || activePage === "alla"} />
+            : <ProjektTabell projects={filtered} onOpen={openProject} showUppfoljning={activePage === "offert" || activePage === "alla"} showAttest={activePage === "avslutad"} />
           }
           {filtered.length > 0 && <div style={{ fontSize: 12, color: C.muted, textAlign: "right" }}>{filtered.length} projekt · {SEK(totalVärde)}</div>}
         </div>
