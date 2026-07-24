@@ -1362,9 +1362,16 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning, showAttest }) => (
           })()}
           <div style={{ display: "flex", alignItems: "center" }}><KategoriChip kategori={p.kategori} /></div>
           <div style={{ display: "flex", alignItems: "center" }}><StatusBadge status={p.status} /></div>
-          <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", flexDirection: "column" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", flexDirection: "column", gap: 2 }}>
             <span>{SEK(kvarstående(p))}</span>
             {delfakturerat(p) > 0 && <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>av {SEK(p.värde)}</span>}
+            {showAttest && beraknaKostnad(p) > 0 && (() => {
+              const attestKlar = allaKostnaderAttesterade(p);
+              const tb = beraknaTB(p);
+              const bg = attestKlar ? C.greenLight : C.orangeLight;
+              const col = attestKlar ? C.green : C.orange;
+              return <span style={{ fontSize: 10, fontWeight: 700, color: col, background: bg, borderRadius: 4, padding: "1px 5px" }}>TB: {SEK(tb)}</span>;
+            })()}
           </div>
         </div>
       );
