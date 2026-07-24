@@ -1134,11 +1134,13 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       <Cell width={100}>{p.bekraftadInstallationDatum || p.fardigDag || "–"}</Cell>
                       <div style={{ width: 55, minWidth: 55, textAlign: "center" }}>{vaskDisplay(p)}</div>
                       <div style={{ width: 60, minWidth: 60, textAlign: "center" }}>
-                        {p.harVask && p.vaskTillhandahåller === "kund"
-                          ? <span style={{ color: C.muted }}>––</span>
-                          : p.harVask && p.vaskTillhandahåller === "vi"
-                            ? ja(p.vaskOrderSkickad)
-                            : ja(p.orderSkickadLeverantör)}
+                        {!p.harVask
+                          ? <span style={{ color: C.border }}>–</span>
+                          : p.vaskTillhandahåller === "kund"
+                            ? <span style={{ color: C.muted }}>––</span>
+                            : p.vaskOrderSkickad
+                              ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span>
+                              : <span style={{ color: "#fff", background: C.red, borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>!</span>}
                       </div>
                       <div style={{ flex: 1 }} />
                       <div style={{ width: 110, minWidth: 110 }}><KategoriChip kategori={p.kategori} /></div>
