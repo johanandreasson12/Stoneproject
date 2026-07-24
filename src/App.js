@@ -1018,31 +1018,106 @@ const TappadStatistik = ({ projects }) => {
 // ── ORDER PLANERINGSVY ────────────────────────────────────────────────────────
 const OrderPlaneringsvyn = ({ projects, onOpen }) => {
   const orders = projects.filter(p => p.status === "order");
+
+  const Cell = ({ children, width, center }) => (
+    <div style={{ width: width || 100, minWidth: width || 100, fontSize: 11, color: C.muted, textAlign: center ? "center" : "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {children}
+    </div>
+  );
+
+  const ColHeader = ({ label, width, center }) => (
+    <div style={{ width: width || 100, minWidth: width || 100, fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, textAlign: center ? "center" : "left" }}>
+      {label}
+    </div>
+  );
+
+  const ja = (v) => v ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span> : <span style={{ color: C.border }}>–</span>;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {ORDER_STEG.map(steg => {
         const grupp = orders.filter(p => p.orderstatus === steg.id);
         return (
           <div key={steg.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+            {/* Steg-header */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: C.grayLight, borderBottom: grupp.length ? `1px solid ${C.border}` : "none" }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: grupp.length ? C.accent : C.border }} />
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{steg.label}</div>
               <div style={{ fontSize: 11, color: C.muted, marginLeft: "auto" }}>{grupp.length} order{grupp.length !== 1 ? "s" : ""}</div>
             </div>
-            {grupp.map(p => (
-              <div key={p.id} onClick={() => onOpen(p)} style={{ padding: "10px 16px", display: "flex", gap: 16, alignItems: "center", cursor: "pointer", borderBottom: `1px solid ${C.border}` }}
-                onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.namn}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{p.produkt} · {p.orderNummer || "Fortnox saknas"}</div>
+
+            {grupp.length > 0 && (
+              <>
+                {/* Kolumnhuvuden */}
+                <div style={{ display: "flex", gap: 8, padding: "6px 16px", background: "#FAFAFA", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+                  <div style={{ width: 160, minWidth: 160, fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Kund / Produkt</div>
+                  <ColHeader label="Prel. mätning" width={110} />
+                  <ColHeader label="Mäts av" width={80} />
+                  <ColHeader label="Bekr. datum" width={100} />
+                  <ColHeader label="Prel. lev." width={110} />
+                  <ColHeader label="Lev/Inst. av" width={90} />
+                  <ColHeader label="Bekr. Datum" width={100} />
+                  <ColHeader label="Vask" width={45} center />
+                  <ColHeader label="Beställd" width={60} center />
+                  <div style={{ flex: 1 }} />
+                  <ColHeader label="Kategori" width={110} />
+                  <ColHeader label="Värde / TB" width={120} />
                 </div>
-                <KategoriChip kategori={p.kategori} />
-                {p.prelimVeckaLeverans && <div style={{ fontSize: 11, background: C.accentLight, color: C.accent, borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>v.{p.prelimVeckaLeverans}</div>}
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{SEK(p.värde)}</div>
-                {beraknaKostnad(p) > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: beraknaTB(p) >= 0 ? C.green : C.red }}>TB: {SEK(beraknaTB(p))}</div>}
-              </div>
-            ))}
+
+                {/* Rader */}
+                {grupp.map(p => {
+                  const matAv = p.mätningstyp === "kontrollmätas" ? (p.mätningUE ? "UE" : "Vi") : "–";
+                  const levAv = p.leveranstyp === "installeras_av_oss" ? (p.leveransUE ? "Inst. UE" : "Inst. vi") : p.leveranstyp === "avhämtas" ? "Avhämtas" : "Skickas";
+                  return (
+                    <div key={p.id} onClick={() => onOpen(p)} style={{ display: "flex", gap: 8, padding: "10px 16px", alignItems: "center", cursor: "pointer", borderBottom: `1px solid ${C.border}`, transition: "background 0.1s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      
+                      {/* Kund / Produkt */}
+                      <div style={{ width: 160, minWidth: 160 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.namn}</div>
+                        <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.produkt} · {p.orderNummer || "Fortnox saknas"}</div>
+                      </div>
+
+                      {/* Prel. mätning */}
+                      <Cell width={110}>{p.prelimDatumMätning || "–"}</Cell>
+
+                      {/* Mäts av */}
+                      <Cell width={80}>{matAv}</Cell>
+
+                      {/* Bekr. mätningsdatum */}
+                      <Cell width={100}>{p.bekraftadMatningDatum || "–"}</Cell>
+
+                      {/* Prel. leverans */}
+                      <Cell width={110}>{p.prelimDatumLeverans || "–"}</Cell>
+
+                      {/* Lev/Inst. av */}
+                      <Cell width={90}>{levAv}</Cell>
+
+                      {/* Bekr. installationsdatum */}
+                      <Cell width={100}>{p.bekraftadInstallationDatum || p.fardigDag || "–"}</Cell>
+
+                      {/* Vask */}
+                      <div style={{ width: 45, minWidth: 45, textAlign: "center" }}>{p.harVask ? ja(true) : <span style={{ color: C.border }}>–</span>}</div>
+
+                      {/* Order beställd */}
+                      <div style={{ width: 60, minWidth: 60, textAlign: "center" }}>{ja(p.orderSkickadLeverantör)}</div>
+
+                      <div style={{ flex: 1 }} />
+
+                      {/* Kategori */}
+                      <div style={{ width: 110, minWidth: 110 }}><KategoriChip kategori={p.kategori} /></div>
+
+                      {/* Värde / TB */}
+                      <div style={{ width: 120, minWidth: 120, textAlign: "right" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{SEK(kvarstående(p))}</div>
+                        {beraknaKostnad(p) > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: beraknaTB(p) >= 0 ? C.green : C.red }}>TB: {SEK(beraknaTB(p))}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
         );
       })}
@@ -2084,8 +2159,8 @@ export default function App() {
 
       {/* Modaler */}
       {selected && selected.status === "offert" && <OffertModal project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} onPromoteToOrder={promoteToOrder} />}
-      {selected && (selected.status === "order" || selected.status === "faktureras") && <OrderModal project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} />}
-      {selected && !["offert", "order", "faktureras"].includes(selected.status) && (
+      {selected && (selected.status === "order" || selected.status === "faktureras" || selected.status === "avslutad") && <OrderModal project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} />}
+      {selected && !["offert", "order", "faktureras", "avslutad"].includes(selected.status) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }} onClick={() => setSelected(null)}>
           <div style={{ background: C.surface, borderRadius: 14, width: "100%", maxWidth: 480, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
