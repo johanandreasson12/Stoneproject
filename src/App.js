@@ -1018,6 +1018,24 @@ const TappadStatistik = ({ projects }) => {
 // ── ORDER PLANERINGSVY ────────────────────────────────────────────────────────
 const OrderPlaneringsvyn = ({ projects, onOpen }) => {
   const orders = projects.filter(p => p.status === "order");
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState(1);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d * -1);
+    else { setSortKey(key); setSortDir(1); }
+  };
+
+  const sortVal = (p, key) => {
+    if (key === "matning") return p.prelimDatumMätning || "9999";
+    if (key === "leverans") return p.prelimDatumLeverans || "9999";
+    if (key === "bekr_mat") return p.bekraftadMatningDatum || "9999";
+    if (key === "bekr_inst") return p.bekraftadInstallationDatum || p.fardigDag || "9999";
+    if (key === "namn") return p.namn || "";
+    if (key === "värde") return kvarstående(p);
+    if (key === "tb") return beraknaTB(p);
+    return "";
+  };
 
   const Cell = ({ children, width, center }) => (
     <div style={{ width: width || 100, minWidth: width || 100, fontSize: 11, color: C.muted, textAlign: center ? "center" : "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1025,18 +1043,37 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
     </div>
   );
 
-  const ColHeader = ({ label, width, center }) => (
-    <div style={{ width: width || 100, minWidth: width || 100, fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, textAlign: center ? "center" : "left" }}>
-      {label}
-    </div>
-  );
+  const ColHeader = ({ label, width, center, sortK }) => {
+    const active = sortKey === sortK;
+    return (
+      <div onClick={sortK ? () => toggleSort(sortK) : undefined}
+        style={{ width: width || 100, minWidth: width || 100, fontSize: 10, fontWeight: 700, color: active ? C.accent : C.muted, textTransform: "uppercase", letterSpacing: 0.5, textAlign: center ? "center" : "left", cursor: sortK ? "pointer" : "default", userSelect: "none", display: "flex", alignItems: "center", gap: 2 }}>
+        {label}
+        {sortK && <span style={{ fontSize: 9 }}>{active ? (sortDir === 1 ? " ▲" : " ▼") : " ↕"}</span>}
+      </div>
+    );
+  };
+
+  const vaskDisplay = (p) => {
+    if (!p.harVask) return <span style={{ color: C.border }}>–</span>;
+    if (p.vaskTillhandahåller === "kund") return <span style={{ fontSize: 10, color: C.purple, fontWeight: 600 }}>Kund</span>;
+    return <span style={{ color: C.green, fontWeight: 700 }}>✓ Vi</span>;
+  };
 
   const ja = (v) => v ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span> : <span style={{ color: C.border }}>–</span>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {ORDER_STEG.map(steg => {
-        const grupp = orders.filter(p => p.orderstatus === steg.id);
+        let grupp = orders.filter(p => p.orderstatus === steg.id);
+        if (sortKey && grupp.length > 0) {
+          grupp = [...grupp].sort((a, b) => {
+            const av = sortVal(a, sortKey);
+            const bv = sortVal(b, sortKey);
+            if (typeof av === "number") return (av - bv) * sortDir;
+            return av.localeCompare(bv) * sortDir;
+          });
+        }
         return (
           <div key={steg.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
             {/* Steg-header */}
@@ -1050,18 +1087,18 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
               <>
                 {/* Kolumnhuvuden */}
                 <div style={{ display: "flex", gap: 8, padding: "6px 16px", background: "#FAFAFA", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
-                  <div style={{ width: 160, minWidth: 160, fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Kund / Produkt</div>
-                  <ColHeader label="Prel. mätning" width={110} />
+                  <ColHeader label="Kund / Produkt" width={160} sortK="namn" />
+                  <ColHeader label="Prel. mätning" width={110} sortK="matning" />
                   <ColHeader label="Mäts av" width={80} />
-                  <ColHeader label="Bekr. datum" width={100} />
-                  <ColHeader label="Prel. lev." width={110} />
+                  <ColHeader label="Bekr. datum" width={100} sortK="bekr_mat" />
+                  <ColHeader label="Prel. lev." width={110} sortK="leverans" />
                   <ColHeader label="Lev/Inst. av" width={90} />
-                  <ColHeader label="Bekr. Datum" width={100} />
-                  <ColHeader label="Vask" width={45} center />
+                  <ColHeader label="Bekr. Datum" width={100} sortK="bekr_inst" />
+                  <ColHeader label="Vask" width={55} center />
                   <ColHeader label="Beställd" width={60} center />
                   <div style={{ flex: 1 }} />
                   <ColHeader label="Kategori" width={110} />
-                  <ColHeader label="Värde / TB" width={120} />
+                  <ColHeader label="Värde / TB" width={120} sortK="värde" />
                 </div>
 
                 {/* Rader */}
@@ -1073,42 +1110,20 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       
-                      {/* Kund / Produkt */}
                       <div style={{ width: 160, minWidth: 160 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.namn}</div>
                         <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.produkt} · {p.orderNummer || "Fortnox saknas"}</div>
                       </div>
-
-                      {/* Prel. mätning */}
                       <Cell width={110}>{p.prelimDatumMätning || "–"}</Cell>
-
-                      {/* Mäts av */}
                       <Cell width={80}>{matAv}</Cell>
-
-                      {/* Bekr. mätningsdatum */}
                       <Cell width={100}>{p.bekraftadMatningDatum || "–"}</Cell>
-
-                      {/* Prel. leverans */}
                       <Cell width={110}>{p.prelimDatumLeverans || "–"}</Cell>
-
-                      {/* Lev/Inst. av */}
                       <Cell width={90}>{levAv}</Cell>
-
-                      {/* Bekr. installationsdatum */}
                       <Cell width={100}>{p.bekraftadInstallationDatum || p.fardigDag || "–"}</Cell>
-
-                      {/* Vask */}
-                      <div style={{ width: 45, minWidth: 45, textAlign: "center" }}>{p.harVask ? ja(true) : <span style={{ color: C.border }}>–</span>}</div>
-
-                      {/* Order beställd */}
+                      <div style={{ width: 55, minWidth: 55, textAlign: "center" }}>{vaskDisplay(p)}</div>
                       <div style={{ width: 60, minWidth: 60, textAlign: "center" }}>{ja(p.orderSkickadLeverantör)}</div>
-
                       <div style={{ flex: 1 }} />
-
-                      {/* Kategori */}
                       <div style={{ width: 110, minWidth: 110 }}><KategoriChip kategori={p.kategori} /></div>
-
-                      {/* Värde / TB */}
                       <div style={{ width: 120, minWidth: 120, textAlign: "right" }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{SEK(kvarstående(p))}</div>
                         {beraknaKostnad(p) > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: beraknaTB(p) >= 0 ? C.green : C.red }}>TB: {SEK(beraknaTB(p))}</div>}
@@ -1124,6 +1139,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
     </div>
   );
 };
+
 
 // ── NY PROJEKT MODAL (flersteg) ──────────────────────────────────────────────
 const NyProjektModal = ({ onClose, onSave, onSaveAndOrder, nextNummer, defaultStatus }) => {
