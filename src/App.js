@@ -1365,12 +1365,22 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning, showAttest }) => (
           <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", flexDirection: "column", gap: 2 }}>
             <span>{SEK(kvarstående(p))}</span>
             {delfakturerat(p) > 0 && <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>av {SEK(p.värde)}</span>}
-            {showAttest && beraknaKostnad(p) > 0 && (() => {
+            {showAttest && (() => {
               const attestKlar = allaKostnaderAttesterade(p);
-              const tb = beraknaTB(p);
+              // For TB display when attested, use full costs (attested amounts)
+              const totalKostnad = (
+                (Number((p.attester?.sten?.faktiskKostnad) || p.leverantörInköpspris) || 0) +
+                (Number((p.attester?.vask?.faktiskKostnad) || (p.harVask && p.vaskTillhandahåller === "vi" ? p.vaskInköpspris : 0)) || 0) +
+                (Number((p.attester?.frakt?.faktiskKostnad) || (p.fraktSkaBokas ? p.fraktKostnad : 0)) || 0) +
+                (Number((p.attester?.uematning?.faktiskKostnad) || (p.mätningUE ? p.ueMatningKostnad : 0)) || 0) +
+                (Number((p.attester?.ueinstallation?.faktiskKostnad) || (p.leveransUE ? p.ueInstallationKostnad : 0)) || 0)
+              );
+              if (totalKostnad === 0) return null;
+              const tb = kvarstående(p) - totalKostnad;
               const bg = attestKlar ? C.greenLight : C.orangeLight;
               const col = attestKlar ? C.green : C.orange;
-              return <span style={{ fontSize: 10, fontWeight: 700, color: col, background: bg, borderRadius: 4, padding: "1px 5px" }}>TB: {SEK(tb)}</span>;
+              const tbPct = kvarstående(p) > 0 ? Math.round(tb / kvarstående(p) * 100) : 0;
+              return <span style={{ fontSize: 10, fontWeight: 700, color: col, background: bg, borderRadius: 4, padding: "1px 5px" }}>TB: {SEK(tb)} ({tbPct}%)</span>;
             })()}
           </div>
         </div>
