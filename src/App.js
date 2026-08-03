@@ -220,17 +220,17 @@ const ärAttesterad = (p, key) => {
   return !!a.attesterad;
 };
 
-// Återstående kostnad för en post = budget minus attesterat (aldrig negativt)
+// Återstående kostnad för en post = vad som ännu inte är attesterat
 const återståendeKostnad = (p, key, budget) => {
   const a = (p.attester || {})[key];
   if (!a) return Number(budget) || 0;
-  // For delfakturor: budget minus already attested
+  // For delfakturor: budget minus already attested (never negative)
   if (a.fakturor) {
     const attesterat = a.fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
     return Math.max(0, (Number(budget) || 0) - attesterat);
   }
-  // Single invoice: if attested use actual, else budget
-  if (a.attesterad) return Number(a.faktiskKostnad) || Number(budget) || 0;
+  // Single invoice: if fully attested = 0 remaining, else full budget
+  if (a.attesterad) return 0;
   return Number(budget) || 0;
 };
 
