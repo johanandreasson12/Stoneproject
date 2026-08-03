@@ -221,17 +221,17 @@ const ärAttesterad = (p, key) => {
 };
 
 const beraknaKostnad = (p) => {
-  // Always count all costs - use attested amount if available, otherwise budget
+  // Only count non-attested costs (remaining costs that may still hit)
   return (
-    inköpBelopp(p, "sten", p.leverantörInköpspris) +
-    inköpBelopp(p, "vask", p.vaskInköpspris) +
-    inköpBelopp(p, "frakt", p.fraktKostnad) +
-    inköpBelopp(p, "uematning", p.ueMatningKostnad) +
-    inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad)
+    (ärAttesterad(p, "sten") ? 0 : (Number(p.leverantörInköpspris) || 0)) +
+    (ärAttesterad(p, "vask") ? 0 : (p.harVask && p.vaskTillhandahåller === "vi" ? (Number(p.vaskInköpspris) || 0) : 0)) +
+    (ärAttesterad(p, "frakt") ? 0 : (p.fraktSkaBokas ? (Number(p.fraktKostnad) || 0) : 0)) +
+    (ärAttesterad(p, "uematning") ? 0 : (p.mätningUE ? (Number(p.ueMatningKostnad) || 0) : 0)) +
+    (ärAttesterad(p, "ueinstallation") ? 0 : (p.leveransUE ? (Number(p.ueInstallationKostnad) || 0) : 0))
   );
 };
 
-const beraknaTB = (p) => (p.värde || 0) - beraknaKostnad(p);
+const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
