@@ -1601,6 +1601,7 @@ const DelfaktureringPanel = ({ project, onChange }) => {
 const ProjektTodosPanel = ({ todos, onChange }) => {
   const [nyText, setNyText] = useState("");
   const [nyDatum, setNyDatum] = useState("");
+  const [redigeraId, setRedigeraId] = useState(null);
 
   const laggTill = () => {
     if (!nyText.trim()) return;
@@ -1612,6 +1613,11 @@ const ProjektTodosPanel = ({ todos, onChange }) => {
 
   const toggleKlar = (id) => {
     onChange((todos || []).map(t => t.id === id ? { ...t, klar: !t.klar } : t));
+  };
+
+  const uppdateraDatum = (id, datum) => {
+    onChange((todos || []).map(t => t.id === id ? { ...t, datum } : t));
+    setRedigeraId(null);
   };
 
   const tabort = (id) => {
@@ -1629,9 +1635,18 @@ const ProjektTodosPanel = ({ todos, onChange }) => {
             <input type="checkbox" checked={t.klar} onChange={() => toggleKlar(t.id)} style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, color: t.klar ? C.muted : C.text, textDecoration: t.klar ? "line-through" : "none" }}>{t.text}</div>
-              {t.datum && <div style={{ fontSize: 11, fontWeight: 600, color: t.klar ? C.muted : fc }}>
-                {d === null ? "" : d < 0 ? `${Math.abs(d)} dagar sen` : d === 0 ? "Idag!" : `Om ${d} dagar`} · {t.datum}
-              </div>}
+              {redigeraId === t.id ? (
+                <input type="date" defaultValue={t.datum} autoFocus
+                  onChange={e => uppdateraDatum(t.id, e.target.value)}
+                  onBlur={e => uppdateraDatum(t.id, e.target.value)}
+                  style={{ ...inputSt, fontSize: 11, padding: "2px 6px", marginTop: 2 }} />
+              ) : (
+                <div onClick={() => setRedigeraId(t.id)} style={{ fontSize: 11, fontWeight: 600, color: t.klar ? C.muted : fc, cursor: "pointer" }} title="Klicka för att ändra datum">
+                  {t.datum
+                    ? `${d === null ? "" : d < 0 ? `${Math.abs(d)} dagar sen` : d === 0 ? "Idag!" : `Om ${d} dagar`} · ${t.datum} ✎`
+                    : <span style={{ color: C.muted }}>+ Lägg till datum</span>}
+                </div>
+              )}
             </div>
             <button onClick={() => tabort(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1 }}>×</button>
           </div>
