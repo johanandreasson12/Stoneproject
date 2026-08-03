@@ -221,13 +221,13 @@ const ärAttesterad = (p, key) => {
 };
 
 const beraknaKostnad = (p) => {
-  // Only count non-attested costs (attested = already paid/gone)
+  // Always count all costs - use attested amount if available, otherwise budget
   return (
-    (ärAttesterad(p, "sten") ? 0 : inköpBelopp(p, "sten", p.leverantörInköpspris)) +
-    (ärAttesterad(p, "vask") ? 0 : inköpBelopp(p, "vask", p.vaskInköpspris)) +
-    (ärAttesterad(p, "frakt") ? 0 : inköpBelopp(p, "frakt", p.fraktKostnad)) +
-    (ärAttesterad(p, "uematning") ? 0 : inköpBelopp(p, "uematning", p.ueMatningKostnad)) +
-    (ärAttesterad(p, "ueinstallation") ? 0 : inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad))
+    inköpBelopp(p, "sten", p.leverantörInköpspris) +
+    inköpBelopp(p, "vask", p.vaskInköpspris) +
+    inköpBelopp(p, "frakt", p.fraktKostnad) +
+    inköpBelopp(p, "uematning", p.ueMatningKostnad) +
+    inköpBelopp(p, "ueinstallation", p.ueInstallationKostnad)
   );
 };
 
