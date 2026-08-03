@@ -220,14 +220,28 @@ const ärAttesterad = (p, key) => {
   return !!a.attesterad;
 };
 
+// Återstående kostnad för en post = budget minus attesterat (aldrig negativt)
+const återståendeKostnad = (p, key, budget) => {
+  const a = (p.attester || {})[key];
+  if (!a) return Number(budget) || 0;
+  // For delfakturor: budget minus already attested
+  if (a.fakturor) {
+    const attesterat = a.fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+    return Math.max(0, (Number(budget) || 0) - attesterat);
+  }
+  // Single invoice: if attested use actual, else budget
+  if (a.attesterad) return Number(a.faktiskKostnad) || Number(budget) || 0;
+  return Number(budget) || 0;
+};
+
 const beraknaKostnad = (p) => {
-  // Only count non-attested costs (remaining costs that may still hit)
+  // Count remaining costs (budget minus what's already been attested)
   return (
-    (ärAttesterad(p, "sten") ? 0 : (Number(p.leverantörInköpspris) || 0)) +
-    (ärAttesterad(p, "vask") ? 0 : (p.harVask && p.vaskTillhandahåller === "vi" ? (Number(p.vaskInköpspris) || 0) : 0)) +
-    (ärAttesterad(p, "frakt") ? 0 : (p.fraktSkaBokas ? (Number(p.fraktKostnad) || 0) : 0)) +
-    (ärAttesterad(p, "uematning") ? 0 : (p.mätningUE ? (Number(p.ueMatningKostnad) || 0) : 0)) +
-    (ärAttesterad(p, "ueinstallation") ? 0 : (p.leveransUE ? (Number(p.ueInstallationKostnad) || 0) : 0))
+    återståendeKostnad(p, "sten", p.leverantörInköpspris) +
+    (p.harVask && p.vaskTillhandahåller === "vi" ? återståendeKostnad(p, "vask", p.vaskInköpspris) : 0) +
+    (p.fraktSkaBokas ? återståendeKostnad(p, "frakt", p.fraktKostnad) : 0) +
+    (p.mätningUE ? återståendeKostnad(p, "uematning", p.ueMatningKostnad) : 0) +
+    (p.leveransUE ? återståendeKostnad(p, "ueinstallation", p.ueInstallationKostnad) : 0)
   );
 };
 
