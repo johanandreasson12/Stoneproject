@@ -39,6 +39,7 @@ const toDb = (p) => ({
   ue_installation_kostnad: p.ueInstallationKostnad || null,
   prelim_datum_leverans: p.prelimDatumLeverans || null,
   bekraftad_installation_datum: p.bekraftadInstallationDatum || null,
+  bekraftat_leverans_datum: p.bekraftatLeveransDatum || null,
   producent: p.producent || null,
   har_vask: p.harVask || false,
   vask_tillhandahaller: p.vaskTillhandahåller || null,
@@ -104,6 +105,7 @@ const fromDb = (r) => ({
   ueInstallationKostnad: r.ue_installation_kostnad || "",
   prelimDatumLeverans: r.prelim_datum_leverans || "",
   bekraftadInstallationDatum: r.bekraftad_installation_datum || "",
+  bekraftatLeveransDatum: r.bekraftat_leverans_datum || "",
   producent: r.producent || "Cosentino",
   harVask: r.har_vask || false,
   vaskTillhandahåller: r.vask_tillhandahaller || "vi",
@@ -191,7 +193,11 @@ const kvarstående = (p) => (p.värde || 0) - delfakturerat(p);
 
 const attestBelopp = (p, key) => {
   const a = (p.attester || {})[key];
-  return a && a.faktiskKostnad ? Number(a.faktiskKostnad) : null;
+  if (!a) return null;
+  // New structure: fakturor array
+  if (a.fakturor && a.fakturor.length > 0) return a.fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+  // Old structure: single faktiskKostnad
+  return a.faktiskKostnad ? Number(a.faktiskKostnad) : null;
 };
 const inköpBelopp = (p, key, budget) => attestBelopp(p, key) !== null ? attestBelopp(p, key) : (Number(budget) || 0);
 
@@ -209,7 +215,9 @@ const allaKostnaderAttesterade = (p) => {
 
 const ärAttesterad = (p, key) => {
   const a = (p.attester || {})[key];
-  return a && a.attesterad;
+  if (!a) return false;
+  if (a.fakturor) return a.fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0) >= Number(a.budget || 0) * 0.99;
+  return !!a.attesterad;
 };
 
 const beraknaKostnad = (p) => {
@@ -854,6 +862,11 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   <KalenderVäljare value={f.bekraftadInstallationDatum || ""} onChange={v => set("bekraftadInstallationDatum", v)} />
                 </Field>
               )}
+              {(f.leveranstyp === "skickas_till_kund" || f.leveranstyp === "avhämtas") && (
+                <Field label="Bekräftat leveransdatum">
+                  <KalenderVäljare value={f.bekraftatLeveransDatum || ""} onChange={v => set("bekraftatLeveransDatum", v)} />
+                </Field>
+              )}
               {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
                 <Field label="Kostnad UE installation (kr)">
                   <input type="number" value={f.ueInstallationKostnad || ""} onChange={e => set("ueInstallationKostnad", e.target.value)} placeholder="0" style={inputSt} />
@@ -1371,17 +1384,17 @@ const ProjektTabell = ({ projects, onOpen, showUppfoljning, showAttest }) => (
               const attestKlar = allaKostnaderAttesterade(p);
               // For TB display when attested, use full costs (attested amounts)
               const totalKostnad = (
-                (Number((p.attester?.sten?.faktiskKostnad) || p.leverantörInköpspris) || 0) +
-                (Number((p.attester?.vask?.faktiskKostnad) || (p.harVask && p.vaskTillhandahåller === "vi" ? p.vaskInköpspris : 0)) || 0) +
-                (Number((p.attester?.frakt?.faktiskKostnad) || (p.fraktSkaBokas ? p.fraktKostnad : 0)) || 0) +
-                (Number((p.attester?.uematning?.faktiskKostnad) || (p.mätningUE ? p.ueMatningKostnad : 0)) || 0) +
-                (Number((p.attester?.ueinstallation?.faktiskKostnad) || (p.leveransUE ? p.ueInstallationKostnad : 0)) || 0)
+                (attestBelopp(p, "sten") ?? (Number(p.leverantörInköpspris) || 0)) +
+                (attestBelopp(p, "vask") ?? (p.harVask && p.vaskTillhandahåller === "vi" ? (Number(p.vaskInköpspris) || 0) : 0)) +
+                (attestBelopp(p, "frakt") ?? (p.fraktSkaBokas ? (Number(p.fraktKostnad) || 0) : 0)) +
+                (attestBelopp(p, "uematning") ?? (p.mätningUE ? (Number(p.ueMatningKostnad) || 0) : 0)) +
+                (attestBelopp(p, "ueinstallation") ?? (p.leveransUE ? (Number(p.ueInstallationKostnad) || 0) : 0))
               );
               if (totalKostnad === 0) return null;
-              const tb = kvarstående(p) - totalKostnad;
+              const tb = (p.värde || 0) - totalKostnad;
               const bg = attestKlar ? C.greenLight : C.orangeLight;
               const col = attestKlar ? C.green : C.orange;
-              const tbPct = kvarstående(p) > 0 ? Math.round(tb / kvarstående(p) * 100) : 0;
+              const tbPct = p.värde > 0 ? Math.round(tb / p.värde * 100) : 0;
               return <span style={{ fontSize: 10, fontWeight: 700, color: col, background: bg, borderRadius: 4, padding: "1px 5px" }}>TB: {SEK(tb)} ({tbPct}%)</span>;
             })()}
           </div>
@@ -1428,52 +1441,81 @@ const BradeskorFarg = (dagar) => {
 
 
 // ── ATTEST-KOMPONENT ─────────────────────────────────────────────────────────
-const AttestRad = ({ label, budgetBelopp, attestKey, attester, onChange }) => {
+const AttestRad = ({ label, budgetBelopp, attestKey, attester, onChange, stöderDelfakturor }) => {
   const a = (attester || {})[attestKey] || {};
+  // Support multiple sub-invoices (fakturor array) or single invoice (backwards compat)
+  const fakturor = a.fakturor || (a.faktiskKostnad ? [{ id: 1, faktiskKostnad: a.faktiskKostnad, fakturanummer: a.fakturanummer, fakturadatum: a.fakturadatum }] : []);
+  const totalAttesterat = fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+  const attestKlar = stöderDelfakturor ? (totalAttesterat >= Number(budgetBelopp) * 0.99) : !!a.attesterad;
+
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ faktiskKostnad: a.faktiskKostnad || "", fakturanummer: a.fakturanummer || "", fakturadatum: a.fakturadatum || "" });
+  const [nyFaktura, setNyFaktura] = useState({ faktiskKostnad: "", fakturanummer: "", fakturadatum: "" });
 
-  if (!budgetBelopp && !a.faktiskKostnad) return null;
+  if (!budgetBelopp && fakturor.length === 0) return null;
 
-  const spara = () => {
-    onChange({ ...(attester || {}), [attestKey]: { ...form, attesterad: true, attestDatum: today() } });
-    setOpen(false);
+  const laggTillFaktura = () => {
+    if (!nyFaktura.faktiskKostnad) return;
+    const nyLista = [...fakturor, { id: Date.now(), ...nyFaktura }];
+    const nyTotal = nyLista.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+    onChange({ ...(attester || {}), [attestKey]: { fakturor: nyLista, attesterad: nyTotal >= Number(budgetBelopp) * 0.99, attestDatum: today() } });
+    setNyFaktura({ faktiskKostnad: "", fakturanummer: "", fakturadatum: "" });
   };
 
-  const avAttest = () => {
-    const ny = { ...(attester || {}) };
-    delete ny[attestKey];
-    onChange(ny);
-    setOpen(false);
+  const taBortFaktura = (id) => {
+    const nyLista = fakturor.filter(f => f.id !== id);
+    const nyTotal = nyLista.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+    if (nyLista.length === 0) {
+      const ny = { ...(attester || {}) };
+      delete ny[attestKey];
+      onChange(ny);
+    } else {
+      onChange({ ...(attester || {}), [attestKey]: { fakturor: nyLista, attesterad: nyTotal >= Number(budgetBelopp) * 0.99, attestDatum: today() } });
+    }
   };
+
+  const diffColor = totalAttesterat > Number(budgetBelopp) ? C.red : totalAttesterat === Number(budgetBelopp) ? C.green : C.orange;
 
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: a.attesterad ? C.greenLight : C.surface, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
-        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${a.attesterad ? C.green : C.border}`, background: a.attesterad ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {a.attesterad && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: attestKlar ? C.greenLight : C.surface, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
+        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${attestKlar ? C.green : C.border}`, background: attestKlar ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {attestKlar && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            Budget: {SEK(Number(budgetBelopp) || 0)}
-            {a.faktiskKostnad && <span style={{ color: a.faktiskKostnad > budgetBelopp ? C.red : C.green, marginLeft: 8 }}>· Faktura: {SEK(Number(a.faktiskKostnad))}</span>}
-            {a.fakturanummer && <span style={{ color: C.muted, marginLeft: 8 }}>· #{a.fakturanummer}</span>}
+          <div style={{ fontSize: 11, color: C.muted, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span>Budget: {SEK(Number(budgetBelopp) || 0)}</span>
+            {totalAttesterat > 0 && <span style={{ color: diffColor }}>Attesterat: {SEK(totalAttesterat)} ({budgetBelopp ? Math.round(totalAttesterat/Number(budgetBelopp)*100) : 0}%)</span>}
+            {stöderDelfakturor && fakturor.length > 0 && <span style={{ color: C.muted }}>{fakturor.length} faktura{fakturor.length !== 1 ? "or" : ""}</span>}
           </div>
         </div>
         <span style={{ color: C.muted, fontSize: 12 }}>{open ? "▲" : "▼"}</span>
       </div>
       {open && (
         <div style={{ padding: 14, borderTop: `1px solid ${C.border}`, background: C.grayLight, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Befintliga fakturor */}
+          {fakturor.map((fak, i) => (
+            <div key={fak.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: C.surface, borderRadius: 8 }}>
+              <div style={{ flex: 1, fontSize: 12 }}>
+                <span style={{ fontWeight: 700, color: C.green }}>{SEK(Number(fak.faktiskKostnad))}</span>
+                {fak.fakturanummer && <span style={{ color: C.muted, marginLeft: 8 }}>#{fak.fakturanummer}</span>}
+                {fak.fakturadatum && <span style={{ color: C.muted, marginLeft: 8 }}>{fak.fakturadatum}</span>}
+              </div>
+              <button onClick={() => taBortFaktura(fak.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16 }}>×</button>
+            </div>
+          ))}
+          {/* Ny faktura */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase" }}>
+            {stöderDelfakturor ? "Lägg till delfaktura" : "Attestera faktura"}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <Field label="Faktisk kostnad (kr)"><input type="number" value={form.faktiskKostnad} onChange={e => setForm(f => ({ ...f, faktiskKostnad: e.target.value }))} style={inputSt} /></Field>
-            <Field label="Fakturanummer"><input value={form.fakturanummer} onChange={e => setForm(f => ({ ...f, fakturanummer: e.target.value }))} style={inputSt} /></Field>
-            <Field label="Fakturadatum"><input type="date" value={form.fakturadatum} onChange={e => setForm(f => ({ ...f, fakturadatum: e.target.value }))} style={inputSt} /></Field>
+            <Field label="Belopp (kr)"><input type="number" value={nyFaktura.faktiskKostnad} onChange={e => setNyFaktura(f => ({ ...f, faktiskKostnad: e.target.value }))} style={inputSt} /></Field>
+            <Field label="Fakturanummer"><input value={nyFaktura.fakturanummer} onChange={e => setNyFaktura(f => ({ ...f, fakturanummer: e.target.value }))} style={inputSt} /></Field>
+            <Field label="Fakturadatum"><input type="date" value={nyFaktura.fakturadatum} onChange={e => setNyFaktura(f => ({ ...f, fakturadatum: e.target.value }))} style={inputSt} /></Field>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={spara} style={{ background: C.green, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer" }}>✓ Attestera</button>
-            {a.attesterad && <button onClick={avAttest} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 14px", cursor: "pointer", color: C.muted, fontSize: 13 }}>Ta bort attest</button>}
-          </div>
+          <button onClick={laggTillFaktura} style={{ background: C.green, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", alignSelf: "flex-start" }}>
+            ✓ {stöderDelfakturor ? "Lägg till" : "Attestera"}
+          </button>
         </div>
       )}
     </div>
@@ -1489,8 +1531,8 @@ const AttestPanel = ({ project, onChange }) => {
       <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>Attestera fakturor</div>
       {project.leverantörInköpspris && <AttestRad label={`Stenmaterial – ${project.producent || "Leverantör"}`} budgetBelopp={project.leverantörInköpspris} attestKey="sten" attester={project.attester} onChange={onChange} />}
       {project.vaskInköpspris && project.harVask && <AttestRad label={`Vask – ${project.vaskModell || "Vask"}`} budgetBelopp={project.vaskInköpspris} attestKey="vask" attester={project.attester} onChange={onChange} />}
-      {project.ueMatningKostnad && project.mätningUE && <AttestRad label="UE Mätning" budgetBelopp={project.ueMatningKostnad} attestKey="uematning" attester={project.attester} onChange={onChange} />}
-      {project.ueInstallationKostnad && project.leveransUE && <AttestRad label="UE Installation" budgetBelopp={project.ueInstallationKostnad} attestKey="ueinstallation" attester={project.attester} onChange={onChange} />}
+      {project.ueMatningKostnad && project.mätningUE && <AttestRad label="UE Mätning" budgetBelopp={project.ueMatningKostnad} attestKey="uematning" attester={project.attester} onChange={onChange} stöderDelfakturor={true} />}
+      {project.ueInstallationKostnad && project.leveransUE && <AttestRad label="UE Installation" budgetBelopp={project.ueInstallationKostnad} attestKey="ueinstallation" attester={project.attester} onChange={onChange} stöderDelfakturor={true} />}
       {project.fraktKostnad && project.fraktSkaBokas && <AttestRad label="Frakt" budgetBelopp={project.fraktKostnad} attestKey="frakt" attester={project.attester} onChange={onChange} />}
     </div>
   );
@@ -1846,17 +1888,21 @@ const AtterGoraPanel = ({ projects, onOpen, kategoriFilter, onIgnorera }) => {
     }
 
     // Frakt: ska vara bokad senast 3 dagar innan färdigdag
-    if (p.status === "order" && p.fraktSkaBokas && !p.fraktBokad && p.fardigDag) {
-      const fardig = new Date(p.fardigDag);
-      const deadline = new Date(fardig);
-      deadline.setDate(deadline.getDate() - 3);
-      const d = Math.round((deadline - new Date()) / 86400000);
-      uppgifter.push({
-        id: `frakt-${p.id}`, projekt: p, typ: "frakt",
-        ikon: "🚛", label: "Frakt ej bokad", ignoreraNyckel: "frakt",
-        detalj: `Boka senast ${deadline.toLocaleDateString("sv-SE")} (3 dagar före färdig ${p.fardigDag})`,
-        dagar: d, sortera: d,
-      });
+    if (p.status === "order" && p.fraktSkaBokas && !p.fraktBokad) {
+      const bekraftatDatum = p.leveranstyp === "installeras_av_oss"
+        ? p.bekraftadInstallationDatum
+        : p.bekraftatLeveransDatum;
+      if (bekraftatDatum) {
+        const deadline = new Date(bekraftatDatum);
+        deadline.setDate(deadline.getDate() - 3);
+        const d = Math.round((deadline - new Date()) / 86400000);
+        uppgifter.push({
+          id: `frakt-${p.id}`, projekt: p, typ: "frakt",
+          ikon: "🚛", label: "Frakt ej bokad", ignoreraNyckel: "frakt",
+          detalj: `Boka senast ${deadline.toLocaleDateString("sv-SE")} (3 dagar före bekräftad leverans ${bekraftatDatum})`,
+          dagar: d, sortera: d,
+        });
+      }
     }
 
     // Bekräfta exakt mätningsdatum senast 1 vecka innan preliminär mätningsvecka
