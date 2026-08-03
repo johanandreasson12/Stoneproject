@@ -246,6 +246,24 @@ const beraknaKostnad = (p) => {
 };
 
 const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
+
+const totalAttesteradKostnad = (p) => {
+  const getAttesterat = (key, budget, villkor) => {
+    if (!villkor) return 0;
+    const a = (p.attester || {})[key];
+    if (!a) return 0;
+    if (a.fakturor) return a.fakturor.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
+    if (a.attesterad) return Number(a.faktiskKostnad) || Number(budget) || 0;
+    return 0;
+  };
+  return (
+    getAttesterat("sten", p.leverantörInköpspris, true) +
+    getAttesterat("vask", p.vaskInköpspris, p.harVask && p.vaskTillhandahåller === "vi") +
+    getAttesterat("frakt", p.fraktKostnad, p.fraktSkaBokas) +
+    getAttesterat("uematning", p.ueMatningKostnad, p.mätningUE) +
+    getAttesterat("ueinstallation", p.ueInstallationKostnad, p.leveransUE)
+  );
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
@@ -992,6 +1010,34 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                 await sb.from("projects").update({ projekt_todos: v }).eq("id", f.id);
                 setProjects(ps => ps.map(p => p.id === f.id ? { ...p, projektTodos: v } : p));
               }} />
+
+          {/* Slutresultat – visas när avslutad och alla kostnader attesterade */}
+          {f.status === "avslutad" && allaKostnaderAttesterade(f) && (() => {
+            const totKostnad = totalAttesteradKostnad(f);
+            const slutTB = (f.värde || 0) - totKostnad;
+            const slutTBPct = f.värde > 0 ? Math.round(slutTB / f.värde * 100) : 0;
+            return (
+              <div style={{ background: slutTB >= 0 ? C.greenLight : C.redLight, border: `2px solid ${slutTB >= 0 ? C.green : C.red}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: slutTB >= 0 ? C.green : C.red, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>
+                  ✓ Projektresultat – alla kostnader attesterade
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted }}>Ordervärde</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{SEK(f.värde)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted }}>Total kostnad</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{SEK(totKostnad)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted }}>Slutligt TB</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: slutTB >= 0 ? C.green : C.red }}>{SEK(slutTB)} <span style={{ fontSize: 13 }}>({slutTBPct}%)</span></div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Avsluta / fakturera order */}
           <div style={{ display: "flex", gap: 10 }}>
