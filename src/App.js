@@ -231,7 +231,7 @@ const beraknaKostnad = (p) => {
   );
 };
 
-const beraknaTB = (p) => kvarstående(p) - beraknaKostnad(p);
+const beraknaTB = (p) => (p.värde || 0) - beraknaKostnad(p);
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ── Exempeldata ──────────────────────────────────────────────────────────────
