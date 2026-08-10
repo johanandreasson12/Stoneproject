@@ -870,7 +870,7 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                 </Field>
               )}
               {f.mätningstyp === "kontrollmätas" && f.mätningUE && (
-                <Toggle label="UE-order för mätning skickad" val={!!f.mätningUEOrderSkickad} onChange={v => set("mätningUEOrderSkickad", v)}>
+                <Toggle label="Underlag skickat till UE" val={!!f.underlagMatSkickat} onChange={v => { set("underlagMatSkickat", v); set("mätningUEOrderSkickad", v); }}>
                   <div style={{ fontSize: 12, color: C.green }}>✓ Skickat</div>
                 </Toggle>
               )}
