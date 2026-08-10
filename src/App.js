@@ -858,7 +858,10 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                   </select>
                 </Field>
               )}
-              <Field label="Preliminärt datum"><KalenderVäljare value={f.prelimDatumMätning || ""} onChange={v => set("prelimDatumMätning", v)} /></Field>
+              {f.mätningstyp === "kontrollmätas"
+                ? <Field label="Preliminärt datum"><KalenderVäljare value={f.prelimDatumMätning || ""} onChange={v => set("prelimDatumMätning", v)} /></Field>
+                : <Field label="Bekräftat datum"><KalenderVäljare value={f.bekraftadMatningDatum || ""} onChange={v => set("bekraftadMatningDatum", v)} /></Field>
+              }
               {f.mätningstyp === "kontrollmätas" && (
                 <Field label="Bekräftat datum för mätning">
                   <KalenderVäljare value={f.bekraftadMatningDatum || ""} onChange={v => set("bekraftadMatningDatum", v)} />
@@ -1207,7 +1210,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       <div style={{ width: 120, minWidth: 120, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {p.bekraftadMatningDatum
                           ? <span style={{ color: C.green, fontWeight: 600 }}>{p.bekraftadMatningDatum}</span>
-                          : p.prelimDatumMätning
+                          : p.mätningstyp === "kontrollmätas" && p.prelimDatumMätning
                             ? <span style={{ color: C.orange }}>P {p.prelimDatumMätning}</span>
                             : <span style={{ color: C.border }}>–</span>}
                       </div>
