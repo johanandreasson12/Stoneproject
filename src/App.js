@@ -909,12 +909,7 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                 </Field>
               )}
               {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
-                <Toggle label="Underlag skickat till UE" val={!!f.underlagInstSkickat} onChange={v => set("underlagInstSkickat", v)}>
-                  <div style={{ fontSize: 12, color: C.green }}>✓ Skickat</div>
-                </Toggle>
-              )}
-              {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
-                <Toggle label="UE-order för installation skickad" val={!!f.installationUEOrderSkickad} onChange={v => set("installationUEOrderSkickad", v)}>
+                <Toggle label="Underlag skickat till UE" val={!!f.underlagInstSkickat} onChange={v => { set("underlagInstSkickat", v); set("installationUEOrderSkickad", v); }}>
                   <div style={{ fontSize: 12, color: C.green }}>✓ Skickat</div>
                 </Toggle>
               )}
@@ -1219,7 +1214,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       <Cell width={70}>{matAv}</Cell>
                       {/* Underlag mätning */}
                       <div style={{ width: 70, minWidth: 70, textAlign: "center" }}>
-                        {p.mätningUE
+                        {p.mätningstyp === "kontrollmätas" && p.mätningUE
                           ? p.underlagMatSkickat
                             ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span>
                             : <span style={{ color: C.red, fontWeight: 700 }}>!</span>
@@ -1238,7 +1233,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       <Cell width={90}>{levAv}</Cell>
                       {/* Underlag installation */}
                       <div style={{ width: 70, minWidth: 70, textAlign: "center" }}>
-                        {p.leveransUE
+                        {p.leveranstyp === "installeras_av_oss" && p.leveransUE
                           ? p.underlagInstSkickat
                             ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span>
                             : <span style={{ color: C.red, fontWeight: 700 }}>!</span>
