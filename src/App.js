@@ -30,6 +30,8 @@ const toDb = (p) => ({
   matningstyp: p.mätningstyp || null,
   matning_ue: p.mätningUE || false,
   matning_ue_order_skickad: p.mätningUEOrderSkickad || false,
+  underlag_mat_skickat: p.underlagMatSkickat || false,
+  underlag_inst_skickat: p.underlagInstSkickat || false,
   ue_matning_kostnad: p.ueMatningKostnad || null,
   prelim_datum_matning: p.prelimDatumMätning || null,
   bekraftad_matning_datum: p.bekraftadMatningDatum || null,
@@ -96,6 +98,8 @@ const fromDb = (r) => ({
   mätningstyp: r.matningstyp || "färdiga_mått",
   mätningUE: r.matning_ue || false,
   mätningUEOrderSkickad: r.matning_ue_order_skickad || false,
+  underlagMatSkickat: r.underlag_mat_skickat || false,
+  underlagInstSkickat: r.underlag_inst_skickat || false,
   ueMatningKostnad: r.ue_matning_kostnad || "",
   prelimDatumMätning: r.prelim_datum_matning || "",
   bekraftadMatningDatum: r.bekraftad_matning_datum || "",
@@ -905,6 +909,11 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
                 </Field>
               )}
               {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
+                <Toggle label="Underlag skickat till UE" val={!!f.underlagInstSkickat} onChange={v => set("underlagInstSkickat", v)}>
+                  <div style={{ fontSize: 12, color: C.green }}>✓ Skickat</div>
+                </Toggle>
+              )}
+              {f.leveranstyp === "installeras_av_oss" && f.leveransUE && (
                 <Toggle label="UE-order för installation skickad" val={!!f.installationUEOrderSkickad} onChange={v => set("installationUEOrderSkickad", v)}>
                   <div style={{ fontSize: 12, color: C.green }}>✓ Skickat</div>
                 </Toggle>
@@ -1173,12 +1182,12 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                 {/* Kolumnhuvuden */}
                 <div style={{ display: "flex", gap: 8, padding: "6px 16px", background: "#FAFAFA", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
                   <ColHeader label="Kund / Produkt" width={160} sortK="namn" />
-                  <ColHeader label="Prel. mätning" width={110} sortK="matning" />
-                  <ColHeader label="Mäts av" width={80} />
-                  <ColHeader label="Bekr. datum" width={100} sortK="bekr_mat" />
-                  <ColHeader label="Prel. lev." width={110} sortK="leverans" />
+                  <ColHeader label="Mätning" width={120} sortK="matning" />
+                  <ColHeader label="Mäts av" width={70} />
+                  <ColHeader label="Underlag" width={70} center />
+                  <ColHeader label="Leverans" width={120} sortK="leverans" />
                   <ColHeader label="Lev/Inst. av" width={90} />
-                  <ColHeader label="Bekr. Datum" width={100} sortK="bekr_inst" />
+                  <ColHeader label="Underlag" width={70} center />
                   <ColHeader label="Vask" width={55} center />
                   <ColHeader label="Beställd" width={60} center />
                   <div style={{ flex: 1 }} />
@@ -1199,12 +1208,42 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.namn}</div>
                         <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.produkt} · {p.orderNummer || "Fortnox saknas"}</div>
                       </div>
-                      <Cell width={110}>{p.prelimDatumMätning || "–"}</Cell>
-                      <Cell width={80}>{matAv}</Cell>
-                      <Cell width={100}>{p.bekraftadMatningDatum || "–"}</Cell>
-                      <Cell width={110}>{p.prelimDatumLeverans || "–"}</Cell>
+                      {/* Mätning - P=preliminär orange, bekräftat grön */}
+                      <div style={{ width: 120, minWidth: 120, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.bekraftadMatningDatum
+                          ? <span style={{ color: C.green, fontWeight: 600 }}>{p.bekraftadMatningDatum}</span>
+                          : p.prelimDatumMätning
+                            ? <span style={{ color: C.orange }}>P {p.prelimDatumMätning}</span>
+                            : <span style={{ color: C.border }}>–</span>}
+                      </div>
+                      <Cell width={70}>{matAv}</Cell>
+                      {/* Underlag mätning */}
+                      <div style={{ width: 70, minWidth: 70, textAlign: "center" }}>
+                        {p.mätningUE
+                          ? p.underlagMatSkickat
+                            ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span>
+                            : <span style={{ color: C.red, fontWeight: 700 }}>!</span>
+                          : <span style={{ color: C.border }}>–</span>}
+                      </div>
+                      {/* Leverans - P=preliminär orange, bekräftat grön */}
+                      <div style={{ width: 120, minWidth: 120, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.bekraftadInstallationDatum
+                          ? <span style={{ color: C.green, fontWeight: 600 }}>{p.bekraftadInstallationDatum}</span>
+                          : p.bekraftatLeveransDatum
+                            ? <span style={{ color: C.green, fontWeight: 600 }}>{p.bekraftatLeveransDatum}</span>
+                            : p.prelimDatumLeverans
+                              ? <span style={{ color: C.orange }}>P {p.prelimDatumLeverans}</span>
+                              : <span style={{ color: C.border }}>–</span>}
+                      </div>
                       <Cell width={90}>{levAv}</Cell>
-                      <Cell width={100}>{p.bekraftadInstallationDatum || p.fardigDag || "–"}</Cell>
+                      {/* Underlag installation */}
+                      <div style={{ width: 70, minWidth: 70, textAlign: "center" }}>
+                        {p.leveransUE
+                          ? p.underlagInstSkickat
+                            ? <span style={{ color: C.green, fontWeight: 700 }}>✓</span>
+                            : <span style={{ color: C.red, fontWeight: 700 }}>!</span>
+                          : <span style={{ color: C.border }}>–</span>}
+                      </div>
                       <div style={{ width: 55, minWidth: 55, textAlign: "center" }}>{vaskDisplay(p)}</div>
                       <div style={{ width: 60, minWidth: 60, textAlign: "center" }}>
                         {!p.harVask
