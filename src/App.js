@@ -2165,6 +2165,7 @@ export default function App() {
   const [activePage, setActivePage] = useState("alla");
   const [search, setSearch] = useState("");
   const [kategoriFilter, setKategoriFilter] = useState(null);
+  const [leverantörFilter, setLeverantörFilter] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [orderFormProjekt, setOrderFormProjekt] = useState(null);
@@ -2190,6 +2191,7 @@ export default function App() {
   const filtered = projects
     .filter(p => page.filter ? p.status === page.filter : true)
     .filter(p => kategoriFilter ? p.kategori === kategoriFilter : true)
+    .filter(p => leverantörFilter ? p.producent === leverantörFilter : true)
     .filter(p => {
       const q = search.toLowerCase();
       const sök = (v) => v && String(v).toLowerCase().includes(q);
@@ -2297,7 +2299,7 @@ export default function App() {
             const count = p.filter ? counts[p.filter] : projects.length;
             const active = activePage === p.id;
             return (
-              <button key={p.id} onClick={() => setActivePage(p.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "rgba(255,255,255,0.12)" : "transparent", color: active ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: active ? 600 : 400, textAlign: "left" }}>
+              <button key={p.id} onClick={() => setActivePage(p.id); setLeverantörFilter(null);} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "rgba(255,255,255,0.12)" : "transparent", color: active ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: active ? 600 : 400, textAlign: "left" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 9 }}><span>{p.icon}</span><span style={{ whiteSpace: "nowrap" }}>{p.label}</span></span>
                 <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", borderRadius: 10, padding: "1px 6px" }}>{count}</span>
               </button>
@@ -2361,6 +2363,21 @@ export default function App() {
             return <button key={k} onClick={() => setKategoriFilter(active ? null : k)} style={{ padding: "4px 13px", borderRadius: 20, border: `1.5px solid ${active ? m.color : C.border}`, background: active ? m.bg : C.surface, color: active ? m.color : C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{m.label}</button>;
           })}
         </div>
+
+        {/* Leverantörsfilter – bara på ordersidan */}
+        {(activePage === "order" || activePage === "faktureras") && (() => {
+          const leverantörer = ["Cosentino", "Landernäs", "Luso Rochas", "Annan leverantör"];
+          return (
+            <div style={{ padding: "6px 24px 0", display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Leverantör:</span>
+              <button onClick={() => setLeverantörFilter(null)} style={{ padding: "3px 10px", borderRadius: 20, border: `1.5px solid ${leverantörFilter === null ? C.accent : C.border}`, background: leverantörFilter === null ? C.accentLight : C.surface, color: leverantörFilter === null ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Alla</button>
+              {leverantörer.map(lev => {
+                const active = leverantörFilter === lev;
+                return <button key={lev} onClick={() => setLeverantörFilter(active ? null : lev)} style={{ padding: "3px 10px", borderRadius: 20, border: `1.5px solid ${active ? C.text : C.border}`, background: active ? C.text : C.surface, color: active ? "#fff" : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{lev}</button>;
+              })}
+            </div>
+          );
+        })()}
 
         {/* Innehåll */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
