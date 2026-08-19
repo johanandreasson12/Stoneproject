@@ -2166,6 +2166,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [kategoriFilter, setKategoriFilter] = useState(null);
   const [leverantörFilter, setLeverantörFilter] = useState(null);
+  const [leverantörFilter, setLeverantörFilter] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [orderFormProjekt, setOrderFormProjekt] = useState(null);
@@ -2191,6 +2192,7 @@ export default function App() {
   const filtered = projects
     .filter(p => page.filter ? p.status === page.filter : true)
     .filter(p => kategoriFilter ? p.kategori === kategoriFilter : true)
+    .filter(p => leverantörFilter ? p.producent === leverantörFilter : true)
     .filter(p => leverantörFilter ? p.producent === leverantörFilter : true)
     .filter(p => {
       const q = search.toLowerCase();
@@ -2378,7 +2380,15 @@ export default function App() {
             </div>
           );
         })()}
-
+{(activePage === "order" || activePage === "faktureras") && (
+  <div style={{ padding: "6px 24px 0", display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
+    <span style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>Leverantör:</span>
+    {["Alla", "Cosentino", "Landernäs", "Luso Rochas", "Annan leverantör"].map(lev => {
+      const active = lev === "Alla" ? leverantörFilter === null : leverantörFilter === lev;
+      return <button key={lev} onClick={() => setLeverantörFilter(lev === "Alla" ? null : (active ? null : lev))} style={{ padding: "3px 10px", borderRadius: 20, border: `1.5px solid ${active ? "#0F1923" : "#E4E7EC"}`, background: active ? "#0F1923" : "#FFFFFF", color: active ? "#fff" : "#6B7280", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{lev}</button>;
+    })}
+  </div>
+)}
         {/* Innehåll */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
           {activePage === "tappad" && <TappadStatistik projects={projects} />}
