@@ -1551,7 +1551,10 @@ const AttestRad = ({ label, budgetBelopp, attestKey, attester, onChange, stöder
   if (!budgetBelopp && fakturor.length === 0) return null;
 
   const laggTillFaktura = () => {
-    if (!nyFaktura.faktiskKostnad) return;
+    if (!nyFaktura.faktiskKostnad || !nyFaktura.fakturanummer || !nyFaktura.fakturadatum) {
+      alert("Fyll i belopp, fakturanummer och datum innan du attesterar.");
+      return;
+    }
     const nyLista = [...fakturor, { id: Date.now(), ...nyFaktura }];
     const nyTotal = nyLista.reduce((s, f) => s + (Number(f.faktiskKostnad) || 0), 0);
     onChange({ ...(attester || {}), [attestKey]: { fakturor: nyLista, attesterad: nyTotal >= Number(budgetBelopp) * 0.99, attestDatum: today() } });
@@ -2388,7 +2391,7 @@ export default function App() {
         })()}
 
         {/* Innehåll */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0, height: 0 }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
           {activePage === "tappad" && <TappadStatistik projects={projects} />}
           {activePage === "alla" && <AtterGoraPanel projects={projects} onOpen={openProject} kategoriFilter={kategoriFilter} onIgnorera={ignoreraTodo} />}
           {activePage === "order"
