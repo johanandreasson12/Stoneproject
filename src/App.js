@@ -2391,7 +2391,7 @@ export default function App() {
         })()}
 
         {/* Innehåll */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16, minHeight: 0, height: "100%" }}>
           {activePage === "tappad" && <TappadStatistik projects={projects} />}
           {activePage === "alla" && <AtterGoraPanel projects={projects} onOpen={openProject} kategoriFilter={kategoriFilter} onIgnorera={ignoreraTodo} />}
           {activePage === "order"
