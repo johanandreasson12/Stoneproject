@@ -1437,7 +1437,7 @@ const NyProjektModal = ({ onClose, onSave, onSaveAndOrder, nextNummer, defaultSt
 
 // ── GENERISK PROJEKTTABELL ───────────────────────────────────────────────────
 const ProjektTabell = ({ projects, onOpen, showUppfoljning, showAttest }) => (
-  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "visible" }}>
     <div style={{ display: "grid", gridTemplateColumns: showUppfoljning ? "0.7fr 1.2fr 1.1fr 90px 100px 90px 80px" : showAttest ? "0.7fr 1.2fr 1.1fr 80px 100px 90px 80px" : "0.7fr 1.2fr 1.1fr 100px 90px 80px", borderBottom: `1px solid ${C.border}`, padding: "10px 16px", background: C.grayLight }}>
       {["Referens", "Kund", "Produkt", showUppfoljning ? "Uppföljning" : null, showAttest ? "Kostnader" : null, "Kategori", "Status", "Värde"].filter(Boolean).map(h => (
         <div key={h} style={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.5, textTransform: "uppercase" }}>{h}</div>
