@@ -2307,7 +2307,7 @@ export default function App() {
             const count = p.filter ? counts[p.filter] : projects.length;
             const active = activePage === p.id;
             return (
-              <button key={p.id} onClick={() => setActivePage(p.id); setLeverantörFilter(null);} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "rgba(255,255,255,0.12)" : "transparent", color: active ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: active ? 600 : 400, textAlign: "left" }}>
+              <button key={p.id} onClick={() => { setActivePage(p.id); setLeverantörFilter(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "rgba(255,255,255,0.12)" : "transparent", color: active ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: active ? 600 : 400, textAlign: "left" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 9 }}><span>{p.icon}</span><span style={{ whiteSpace: "nowrap" }}>{p.label}</span></span>
                 <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", borderRadius: 10, padding: "1px 6px" }}>{count}</span>
               </button>
