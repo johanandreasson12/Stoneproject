@@ -451,6 +451,19 @@ const KalenderVäljare = ({ value, onChange, placeholder }) => {
   );
 };
 
+const ProjektNummerFält = ({ value, onChange, projectId, allProjects }) => {
+  const tomt = value === "" || value === null || value === undefined;
+  const dubblett = !tomt && (allProjects || []).some(p => p.id !== projectId && String(p.referens) === String(value));
+  return (
+    <Field label="Projektnummer">
+      <input type="number" value={value ?? ""} onChange={e => onChange(e.target.value)}
+        style={{ ...inputSt, borderColor: dubblett || tomt ? C.red : C.border }} />
+      {dubblett && <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>⚠ Numret används redan av ett annat projekt</span>}
+      {tomt && <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>Ange ett projektnummer</span>}
+    </Field>
+  );
+};
+
 const Section = ({ title, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>{title}</div>
@@ -469,7 +482,7 @@ const Toggle = ({ label, val, onChange, children }) => (
 );
 
 // ── OFFERT-CRM MODAL ─────────────────────────────────────────────────────────
-const OffertModal = ({ project, onClose, onSave, onDelete, onPromoteToOrder }) => {
+const OffertModal = ({ project, onClose, onSave, onDelete, onPromoteToOrder, allProjects }) => {
   const [form, setForm] = useState({ ...project });
   const [nyLogg, setNyLogg] = useState("");
   const [showTapp, setShowTapp] = useState(false);
@@ -506,6 +519,7 @@ const OffertModal = ({ project, onClose, onSave, onDelete, onPromoteToOrder }) =
 
           {/* Baskort */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <ProjektNummerFält value={form.referens} projectId={form.id} allProjects={allProjects} onChange={v => { set("referens", v); set("lopnummer", v === "" ? null : Number(v)); }} />
             <Field label="Kund"><input value={form.namn} onChange={e => set("namn", e.target.value)} style={inputSt} /></Field>
             <Field label="Produkt"><input value={form.produkt} onChange={e => set("produkt", e.target.value)} style={inputSt} /></Field>
             <Field label="Ansvarig"><input value={form.ansvarig} onChange={e => set("ansvarig", e.target.value)} style={inputSt} /></Field>
@@ -770,7 +784,7 @@ const OrderFormulär = ({ project, onClose, onSave }) => {
 };
 
 // ── ORDERDETALJ MODAL ────────────────────────────────────────────────────────
-const OrderModal = ({ project, onClose, onSave, onDelete }) => {
+const OrderModal = ({ project, onClose, onSave, onDelete, allProjects }) => {
   const [f, setF] = useState({ ...project });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const stegIndex = ORDER_STEG.findIndex(s => s.id === f.orderstatus);
@@ -822,6 +836,7 @@ const OrderModal = ({ project, onClose, onSave, onDelete }) => {
         <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Baskort */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <ProjektNummerFält value={f.referens} projectId={f.id} allProjects={allProjects} onChange={v => { set("referens", v); set("lopnummer", v === "" ? null : Number(v)); }} />
             <Field label="Kund"><input value={f.namn} onChange={e => set("namn", e.target.value)} style={inputSt} /></Field>
             <Field label="Produkt"><input value={f.produkt} onChange={e => set("produkt", e.target.value)} style={inputSt} /></Field>
             <Field label="Värde (kr)"><input type="number" value={f.värde} onChange={e => set("värde", Number(e.target.value))} style={inputSt} /></Field>
@@ -2222,6 +2237,7 @@ export default function App() {
     setSaving(true);
     await fetch(`${API}?id=eq.${updated.id}`, { method: "PATCH", headers: HEADERS, body: JSON.stringify(data) });
     setSaving(false);
+    if (Number(updated.lopnummer)) setNextLopnummer(n => Math.max(n, Number(updated.lopnummer) + 1));
     setProjects(ps => ps.map(p => p.id === updated.id ? { ...updated, uppdaterad: today() } : p));
     setSelected(null);
   };
@@ -2263,7 +2279,10 @@ export default function App() {
       const { id: _id, ...rest } = withStatus;
       const res = await fetch(API, { method: "POST", headers: HEADERS, body: JSON.stringify(toDb(rest)) });
       const [saved] = await res.json();
-      if (saved) setProjects(ps => [fromDb(saved), ...ps]);
+      if (saved) {
+        setProjects(ps => [fromDb(saved), ...ps]);
+        setNextLopnummer(n => Math.max(n, Number(saved.lopnummer) + 1));
+      }
     }
     setSaving(false);
     setOrderFormProjekt(null);
@@ -2406,8 +2425,8 @@ export default function App() {
       </main>
 
       {/* Modaler */}
-      {selected && selected.status === "offert" && <OffertModal project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} onPromoteToOrder={promoteToOrder} />}
-      {selected && (selected.status === "order" || selected.status === "faktureras" || selected.status === "avslutad") && <OrderModal project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} />}
+      {selected && selected.status === "offert" && <OffertModal allProjects={projects} project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} onPromoteToOrder={promoteToOrder} />}
+      {selected && (selected.status === "order" || selected.status === "faktureras" || selected.status === "avslutad") && <OrderModal allProjects={projects} project={selected} onClose={() => setSelected(null)} onSave={saveProject} onDelete={deleteProject} />}
       {selected && !["offert", "order", "faktureras", "avslutad"].includes(selected.status) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }} onClick={() => setSelected(null)}>
           <div style={{ background: C.surface, borderRadius: 14, width: "100%", maxWidth: 480, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
@@ -2419,6 +2438,7 @@ export default function App() {
               <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted }}>×</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+              <ProjektNummerFält value={selected.referens} projectId={selected.id} allProjects={projects} onChange={v => setSelected(s => ({ ...s, referens: v, lopnummer: v === "" ? null : Number(v) }))} />
               {[["Produkt", "produkt"], ["Ansvarig", "ansvarig"], ["Notat", "notat"]].map(([label, key]) => (
                 <Field key={key} label={label}><input defaultValue={selected[key]} style={inputSt} onChange={e => setSelected(s => ({ ...s, [key]: e.target.value }))} /></Field>
               ))}
