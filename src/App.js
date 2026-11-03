@@ -1124,6 +1124,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
     if (key === "bekr_mat") return p.bekraftadMatningDatum || "9999";
     if (key === "bekr_inst") return p.bekraftadInstallationDatum || p.fardigDag || "9999";
     if (key === "namn") return p.namn || "";
+    if (key === "nr") return Number(p.lopnummer || p.referens) || 0;
     if (key === "värde") return kvarstående(p);
     if (key === "tb") return beraknaTB(p);
     return "";
@@ -1179,6 +1180,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
               <>
                 {/* Kolumnhuvuden */}
                 <div style={{ display: "flex", gap: 8, padding: "6px 16px", background: "#FAFAFA", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+                  <ColHeader label="Proj.nr" width={50} sortK="nr" />
                   <ColHeader label="Kund / Produkt" width={160} sortK="namn" />
                   <ColHeader label="Mätning" width={120} sortK="matning" />
                   <ColHeader label="Mäts av" width={70} />
@@ -1202,6 +1204,7 @@ const OrderPlaneringsvyn = ({ projects, onOpen }) => {
                       onMouseEnter={e => e.currentTarget.style.background = C.grayLight}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       
+                      <div style={{ width: 50, minWidth: 50, fontSize: 12, fontWeight: 700, color: C.accent }}>{p.referens}</div>
                       <div style={{ width: 160, minWidth: 160 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.namn}</div>
                         <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.produkt} · {p.orderNummer || "Fortnox saknas"}</div>
